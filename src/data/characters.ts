@@ -1,0 +1,355 @@
+import { WitcherCharacter } from '../types';
+
+export const PREGEN_WITCHERS: WitcherCharacter[] = [
+  {
+    id: 'witcher-wolf',
+    name: 'Vane of Kaer Morhen',
+    title: 'The Gray Wolf of the Yaruga',
+    school: 'Wolf',
+    schoolMotto: 'Steel for humans, silver for monsters, patience for both.',
+    level: 5,
+    armorClass: 16,
+    maxHp: 49,
+    currentHp: 49,
+    tempHp: 0,
+    speed: 35,
+    hitDice: '5d10',
+    hitDiceCurrent: 5,
+    hitDiceTotal: 5,
+    vigor: 4,
+    maxVigor: 4,
+    toxicity: 0,
+    maxToxicity: 100,
+    abilities: {
+      str: 14, // +2
+      dex: 18, // +4
+      con: 16, // +3
+      int: 12, // +1
+      wis: 14, // +2
+      cha: 10, // +0
+    },
+    savingThrows: ['Strength (+5)', 'Dexterity (+7)', 'Constitution (+6)'],
+    skills: [
+      { name: 'Acrobatics', bonus: 7, proficient: true },
+      { name: 'Athletics', bonus: 5, proficient: true },
+      { name: 'Investigation', bonus: 4, proficient: true },
+      { name: 'Nature', bonus: 4, proficient: true },
+      { name: 'Perception (Witcher Senses)', bonus: 8, proficient: true },
+      { name: 'Survival (Tracking)', bonus: 8, proficient: true },
+      { name: 'Stealth', bonus: 7, proficient: true },
+    ],
+    passivePerception: 18,
+    steelWeapon: {
+      name: 'Kaer Morhen Masterwork Steel Longsword',
+      attackBonus: 7,
+      damage: '1d8 + 4 (or 1d10 + 4 versatile)',
+      damageType: 'Slashing (Steel)',
+      properties: ['Versatile', 'Finesse', 'Meteorite Core (+1 to hit)'],
+      description: 'Forged from Mahakaman steel folded twenty times. Balanced for parrying and sweeping strikes against humanoids and beasts.',
+      isSilver: false,
+    },
+    silverWeapon: {
+      name: 'Runic Silver Longsword of the North',
+      attackBonus: 7,
+      damage: '1d8 + 4 (+2d6 radiant/silver vs monsters)',
+      damageType: 'Silver / Slashing',
+      properties: ['Versatile', 'Finesse', 'Runic Inscription', 'Bane of Relicts'],
+      description: 'Lined with elven glyphs that gleam when monstrosities are near. Churns through supernatural flesh and wards off curses.',
+      isSilver: true,
+    },
+    schoolPerk: {
+      name: 'Fluid Riposte & Wolf Adaptability',
+      description: 'Reaction: When hit by a melee attack, spend 1 Vigor or Reaction to roll 1d10 + 4 to reduce the damage. If reduced to 0, immediately make a free melee counter-strike.',
+    },
+    mutations: [
+      'Witcher Senses: Advantage on Wisdom (Perception) checks that rely on sight, sound, or smell.',
+      'Trial of the Grasses: Immune to natural diseases; resistance to poison damage; advantage on saves vs poison.',
+      'Cat Eyes: Darkvision 60 ft (120 ft with Cat Potion).',
+      'Extra Attack: Can attack twice whenever taking the Attack action.',
+    ],
+    potions: [
+      { name: 'Swallow', toxicity: 20, charges: 2, maxCharges: 2, duration: '1 minute (10 rounds)', effect: 'Heals 2d4 + 3 HP at the start of each of your turns.' },
+      { name: 'Thunderbolt', toxicity: 25, charges: 2, maxCharges: 2, duration: '1 minute', effect: 'Add +3 bonus damage to all weapon strikes.' },
+      { name: 'Cat', toxicity: 15, charges: 1, maxCharges: 1, duration: '1 hour', effect: 'Grants 120 ft total darkvision and see-in-magical-darkness.' },
+      { name: 'White Honey', toxicity: 0, charges: 1, maxCharges: 1, duration: 'Instantaneous', effect: 'Immediately clears all Toxicity and ends all active potion effects.' },
+    ],
+    bombs: [
+      { name: 'Grapeshot', count: 2, maxCount: 2, radius: '15 ft sphere', effect: 'Deals 3d8 piercing & fire shrapnel damage (DC 15 Dex save for half).' },
+      { name: 'Moon Dust', count: 2, maxCount: 2, radius: '10 ft sphere', effect: 'Prevents monsters from turning invisible or shifting forms for 1 minute; suppresses regeneration.' },
+    ],
+    oils: [
+      { name: 'Relict Oil', targetCategory: 'Relicts (Leshen, Chort)', bonusDamage: '+1d8 damage', charges: 10, maxCharges: 10 },
+      { name: 'Necrophage Oil', targetCategory: 'Necrophages (Grave Hag, Rotfiends)', bonusDamage: '+1d8 damage', charges: 10, maxCharges: 10 },
+      { name: 'Specter Oil', targetCategory: 'Specters & Hounds', bonusDamage: '+1d8 damage', charges: 10, maxCharges: 10 },
+    ],
+    signs: ['Aard', 'Igni', 'Quen', 'Yrden', 'Axii'],
+    backstory: 'Trained beneath the rugged keep of Kaer Morhen by older witchers who remembered when the realm was still young. Vane was sent south along the Yaruga to take royal contracts in the proud kingdom of Cintra before the coming winter freezes the mountain passes. He is a pragmatic tracker who prefers getting paid cleanly over getting entangled in court intrigues.',
+    appearance: 'Lean and muscular with graying dark hair pulled back into a leather cord. A silver wolf medallion rests over weathered leather jerkin reinforced with steel rivets. His amber eyes miss nothing.',
+    flaw: 'Can be overly stoic and cynical, often doubting the promises of Cintrian nobles.',
+    ideal: 'The Witcher Code: Keep your word, protect the innocents from beasts, and never leave a contract unfinished.',
+    bond: 'Carries a silver whetstone gifted by his mentor at Kaer Morhen; sworn to bring coin back to his brothers.',
+    avatarUrl: '/assets/characters/wolf.jpg',
+  },
+  {
+    id: 'witcher-cat',
+    name: 'Sybilla "The Lynx"',
+    title: 'The Shadow of Dyn Marv',
+    school: 'Cat',
+    schoolMotto: 'Speed kills before conscience can speak.',
+    level: 5,
+    armorClass: 17,
+    maxHp: 44,
+    currentHp: 44,
+    tempHp: 0,
+    speed: 40,
+    hitDice: '5d10',
+    hitDiceCurrent: 5,
+    hitDiceTotal: 5,
+    vigor: 4,
+    maxVigor: 4,
+    toxicity: 0,
+    maxToxicity: 100,
+    abilities: {
+      str: 10, // +0
+      dex: 20, // +5
+      con: 14, // +2
+      int: 14, // +2
+      wis: 12, // +1
+      cha: 12, // +1
+    },
+    savingThrows: ['Dexterity (+8)', 'Intelligence (+5)'],
+    skills: [
+      { name: 'Acrobatics', bonus: 8, proficient: true },
+      { name: 'Deception', bonus: 4, proficient: true },
+      { name: 'Insight', bonus: 4, proficient: true },
+      { name: 'Perception', bonus: 7, proficient: true },
+      { name: 'Sleight of Hand', bonus: 8, proficient: true },
+      { name: 'Stealth', bonus: 11, proficient: true }, // Expertise
+    ],
+    passivePerception: 17,
+    steelWeapon: {
+      name: 'Cat School Razor-Fencing Sabres (Dual)',
+      attackBonus: 8,
+      damage: '1d6 + 5 (Main) / 1d6 + 5 (Offhand Bonus Action)',
+      damageType: 'Piercing / Slashing (Steel)',
+      properties: ['Light', 'Finesse', 'Dual-Wielding', 'Crit on 19-20'],
+      description: 'Extremely thin, razor-sharp duelists sabres designed for fast tendon-slitting strokes. When dual wielding, attacks flow without pause.',
+      isSilver: false,
+    },
+    silverWeapon: {
+      name: 'Curved Silver Estoc of Dyn Marv',
+      attackBonus: 8,
+      damage: '1d8 + 5 (+2d6 sneak ambush damage)',
+      damageType: 'Silver / Piercing',
+      properties: ['Finesse', 'Silver Core', 'Needle Tip', 'Crit on 19-20'],
+      description: 'A slender silver rapier capable of finding the soft gaps between a monster’s chitin and scales with devastating precision.',
+      isSilver: true,
+    },
+    schoolPerk: {
+      name: 'Feline Agility & Ambush Strike',
+      description: 'Weapon attacks score a Critical Hit on a d20 roll of 19 or 20. Bonus Action: Can Dash or Disengage. Once per turn, deals an extra 2d6 damage if attacking with advantage or against an enemy engaged by an ally.',
+    },
+    mutations: [
+      'Altered Mutation: Heightened reflexes grant +5 to Initiative checks and immunity to being surprised.',
+      'Feline Grace: Takes half damage from falling; climbing does not cost extra movement.',
+      'Trial of the Grasses: Resistance to poison; darkvision 60 ft.',
+      'Extra Attack: Can attack twice with the main weapon plus once with the off-hand sabre.',
+    ],
+    potions: [
+      { name: 'Swallow', toxicity: 20, charges: 2, maxCharges: 2, duration: '1 minute', effect: 'Heals 2d4 + 3 HP at the start of each of your turns.' },
+      { name: 'Thunderbolt', toxicity: 25, charges: 2, maxCharges: 2, duration: '1 minute', effect: 'Add +3 bonus damage to all weapon strikes.' },
+      { name: 'Blizzard', toxicity: 25, charges: 1, maxCharges: 1, duration: '1 minute', effect: 'When you kill an enemy or score a critical, you enter bullet-time: enemies have disadvantage on attacks against you until your next turn.' },
+      { name: 'White Honey', toxicity: 0, charges: 1, maxCharges: 1, duration: 'Instantaneous', effect: 'Clears all Toxicity.' },
+    ],
+    bombs: [
+      { name: 'Samum', count: 2, maxCount: 2, radius: '10 ft sphere', effect: 'Blinding flash of silver salt: Enemies must succeed on DC 16 Con save or be Stunned and Blinded for 1 round.' },
+      { name: 'Dancing Star', count: 1, maxCount: 1, radius: '15 ft sphere', effect: 'Explosive incendiary burst: 4d6 fire damage and ignites the ground for 2 rounds.' },
+    ],
+    oils: [
+      { name: 'Relict Oil', targetCategory: 'Relicts (Leshen, Chort)', bonusDamage: '+1d8 damage', charges: 10, maxCharges: 10 },
+      { name: 'Necrophage Oil', targetCategory: 'Necrophages (Grave Hag, Rotfiends)', bonusDamage: '+1d8 damage', charges: 10, maxCharges: 10 },
+      { name: 'Hanged Man\'s Venom', targetCategory: 'Humanoids & Bandits', bonusDamage: '+1d8 poison damage', charges: 10, maxCharges: 10 },
+    ],
+    signs: ['Aard', 'Igni', 'Quen', 'Yrden', 'Axii'],
+    backstory: 'The School of the Cat turned away from the orthodox neutrality of Kaer Morhen, producing rogue witchers who operate from roaming caravans and take contracts on men as readily as beasts. Sybilla left the caravan after a bitter dispute over a blood feud in Nazair. She wanders north to Cintra, drawn by rumors of ancient ruins and bountiful royal gold.',
+    appearance: 'Slender, coiled like a spring, dressed in hooded supple black leather with silver cat claw bracers. Her eyes are slit amber feline pupils that glow faintly in shadow. A snarling cat medallion dangles from her collar.',
+    flaw: 'Prone to sudden surges of adrenaline and distrust; quick to draw steel at perceived slights.',
+    ideal: 'Freedom: No master, no king, and no dogma dictates where my daggers strike.',
+    bond: 'Carries a twin set of sabres engraved with the name of a fallen companion from Dyn Marv.',
+    avatarUrl: '/assets/characters/cat.jpg',
+  },
+  {
+    id: 'witcher-griffin',
+    name: 'Alden of Kaer Seren',
+    title: 'The Knight-Witcher',
+    school: 'Griffin',
+    schoolMotto: 'Knowledge is our steel, the signs our sorcery, honor our shield.',
+    level: 5,
+    armorClass: 17,
+    maxHp: 52,
+    currentHp: 52,
+    tempHp: 0,
+    speed: 30,
+    hitDice: '5d10',
+    hitDiceCurrent: 5,
+    hitDiceTotal: 5,
+    vigor: 6, // Expanded Vigor pool
+    maxVigor: 6,
+    toxicity: 0,
+    maxToxicity: 100,
+    abilities: {
+      str: 12, // +1
+      dex: 14, // +2
+      con: 16, // +3
+      int: 18, // +4 (Sign Master)
+      wis: 14, // +2
+      cha: 14, // +2
+    },
+    savingThrows: ['Constitution (+6)', 'Intelligence (+7)', 'Wisdom (+5)'],
+    skills: [
+      { name: 'Arcana', bonus: 7, proficient: true },
+      { name: 'History', bonus: 7, proficient: true },
+      { name: 'Investigation', bonus: 7, proficient: true },
+      { name: 'Perception', bonus: 5, proficient: true },
+      { name: 'Persuasion', bonus: 5, proficient: true },
+      { name: 'Religion', bonus: 7, proficient: true },
+    ],
+    passivePerception: 15,
+    steelWeapon: {
+      name: 'Kaer Seren Silver-Plated Knightly Bastard Sword',
+      attackBonus: 6,
+      damage: '1d8 + 2 (1d10 + 2 versatile)',
+      damageType: 'Slashing (Steel)',
+      properties: ['Versatile', 'Runic Hilt (Sign DC +1)', 'Silver Inlay'],
+      description: 'A beautifully balanced knightly longsword engraved with Griffin heraldry. Channels magic into the blade during Sign casting.',
+      isSilver: false,
+    },
+    silverWeapon: {
+      name: 'Consecrated Silver Blade of Kaer Seren',
+      attackBonus: 6,
+      damage: '1d8 + 2 (+2d6 radiant + 1d8 fire when Igni is primed)',
+      damageType: 'Silver / Radiant',
+      properties: ['Versatile', 'Sign Focus', 'Glowing Runes'],
+      description: 'Laced with purified meteoritic silver and consecrated against unholy spirits. Resonates with intense harmonic hum when signs are cast.',
+      isSilver: true,
+    },
+    schoolPerk: {
+      name: 'Grand Sign Weaver & Yrden Bastion',
+      description: 'Vigor pool is 6. After casting any Witcher Sign, Alden can make a melee weapon strike as a Bonus Action. His Quen shield absorbs +10 extra damage (total 25 temp HP), and his Sign Save DC is 15 (instead of 13).',
+    },
+    mutations: [
+      'Amplified Conduit: The mutagenic formulas of Kaer Seren enhance magical conductivity through the fingers.',
+      'Scholarly Mind: Can decipher ancient elder glyphs, barrow runes, and alchemical formulas without checks.',
+      'Trial of the Grasses: Darkvision 60 ft; disease immunity; poison resistance.',
+      'Extra Attack: Can attack twice when taking the Attack action.',
+    ],
+    potions: [
+      { name: 'Petri\'s Philter', toxicity: 30, charges: 2, maxCharges: 2, duration: '1 minute', effect: 'Enhances Sign intensity: All signs deal +1d8 extra damage and target saves are at disadvantage.' },
+      { name: 'Tawny Owl', toxicity: 20, charges: 2, maxCharges: 2, duration: '1 minute', effect: 'Regenerates 1 Vigor at the start of each of your turns.' },
+      { name: 'Swallow', toxicity: 20, charges: 2, maxCharges: 2, duration: '1 minute', effect: 'Heals 2d4 + 3 HP each round.' },
+      { name: 'White Honey', toxicity: 0, charges: 1, maxCharges: 1, duration: 'Instantaneous', effect: 'Clears all Toxicity.' },
+    ],
+    bombs: [
+      { name: 'Moon Dust', count: 2, maxCount: 2, radius: '10 ft sphere', effect: 'Prevents shapeshifting/incorporeality; forces monsters into physical form.' },
+      { name: 'Devil\'s Puffball', count: 2, maxCount: 2, radius: '15 ft sphere', effect: 'Dense poison cloud: Deals 3d6 poison damage each round inside the haze (DC 15 Con save).' },
+    ],
+    oils: [
+      { name: 'Relict Oil', targetCategory: 'Relicts (Leshen, Chort)', bonusDamage: '+1d8 damage', charges: 10, maxCharges: 10 },
+      { name: 'Specter Oil', targetCategory: 'Specters & Hounds', bonusDamage: '+1d8 damage', charges: 10, maxCharges: 10 },
+      { name: 'Elementa Oil', targetCategory: 'Golems & Elementals', bonusDamage: '+1d8 damage', charges: 10, maxCharges: 10 },
+    ],
+    signs: ['Aard', 'Igni', 'Quen', 'Yrden', 'Axii'],
+    backstory: 'The School of the Griffin atop Mount Erlenwald in Kovir was renowned for its chivalric order, library of magical tomes, and adherence to honorable conduct. Alden was an orphaned son of an impoverished Cintrian noble knight given to the Griffin keep. He returns to his ancestral homeland of Cintra with polished plate armor and ancient texts, eager to prove that a witcher can possess the honor of a knight.',
+    appearance: 'Tall, noble-featured with silver-streaked chestnut hair, clean-shaven jaw, and wearing an ornate cuirass over gambeson with engraved griffin wings. An eagle/griffin medallion gleams on his breastplate. Golden sparks dance between his fingertips.',
+    flaw: 'Can be overly rigid and proud; struggles when forced to make morally gray compromises.',
+    ideal: 'Honor & Enlightenment: Knowledge and discipline elevate us above beasts and tyrants.',
+    bond: 'Carries a battered signet ring of his Cintrian forebears; vows to protect the realm from primeval horrors.',
+    avatarUrl: '/assets/characters/griffin.jpg',
+  },
+  {
+    id: 'witcher-bear',
+    name: 'Bram of Haern Caduch',
+    title: 'The Mountain Chort',
+    school: 'Bear',
+    schoolMotto: 'Stand like the mountain. Strike like the avalanche.',
+    level: 5,
+    armorClass: 18,
+    maxHp: 58,
+    currentHp: 58,
+    tempHp: 0,
+    speed: 30,
+    hitDice: '5d12',
+    hitDiceCurrent: 5,
+    hitDiceTotal: 5,
+    vigor: 4,
+    maxVigor: 4,
+    toxicity: 0,
+    maxToxicity: 100,
+    abilities: {
+      str: 18, // +4
+      dex: 12, // +1
+      con: 18, // +4
+      int: 10, // +0
+      wis: 14, // +2
+      cha: 8,  // -1
+    },
+    savingThrows: ['Strength (+7)', 'Constitution (+7)'],
+    skills: [
+      { name: 'Athletics', bonus: 7, proficient: true },
+      { name: 'Intimidation', bonus: 5, proficient: true },
+      { name: 'Perception', bonus: 5, proficient: true },
+      { name: 'Survival', bonus: 5, proficient: true },
+    ],
+    passivePerception: 15,
+    steelWeapon: {
+      name: 'Haern Caduch Two-Handed Steel Executioner Greatsword',
+      attackBonus: 7,
+      damage: '2d6 + 4',
+      damageType: 'Slashing (Steel)',
+      properties: ['Heavy', 'Two-Handed', 'Sunder Armor', 'Knockback'],
+      description: 'A massive four-foot slab of steel from the Amell mountain forges. On hit, can push a Medium or smaller target 10 feet back.',
+      isSilver: false,
+    },
+    silverWeapon: {
+      name: 'Ursine Great Silver Cleaver',
+      attackBonus: 7,
+      damage: '2d6 + 4 (+2d6 silver against monsters)',
+      damageType: 'Silver / Slashing',
+      properties: ['Heavy', 'Two-Handed', 'Brutal Critical (+1 damage die on crits)'],
+      description: 'Heavier than ordinary witcher silver swords. Shatters bone, carves thick hide, and sends monstrous beasts reeling.',
+      isSilver: true,
+    },
+    schoolPerk: {
+      name: 'Ursine Juggernaut & Quen Bulwark',
+      description: 'Cannot be knocked prone or moved against his will by enemies. When Quen is cast, he gains resistance to Bludgeoning, Piercing, and Slashing damage for the duration. Critical hits with his greatsword automatically knock the enemy Prone.',
+    },
+    mutations: [
+      'Ursine Bulk: Roll hit points using d12 instead of d10. Gains +1 extra HP per level.',
+      'Thickened Hide: Base AC is 18 while wearing medium/heavy armor.',
+      'Trial of the Grasses: Darkvision 60 ft; disease immunity; poison resistance.',
+      'Extra Attack: Can attack twice when taking the Attack action.',
+    ],
+    potions: [
+      { name: 'Swallow', toxicity: 20, charges: 2, maxCharges: 2, duration: '1 minute', effect: 'Heals 2d4 + 3 HP each round.' },
+      { name: 'Thunderbolt', toxicity: 25, charges: 2, maxCharges: 2, duration: '1 minute', effect: 'Adds +3 damage to all weapon attacks.' },
+      { name: 'Maribor Forest', toxicity: 30, charges: 1, maxCharges: 1, duration: '1 minute', effect: 'Immediately generates 2 free Vigor points and increases maximum Vigor by 1.' },
+      { name: 'White Honey', toxicity: 0, charges: 1, maxCharges: 1, duration: 'Instantaneous', effect: 'Clears all Toxicity.' },
+    ],
+    bombs: [
+      { name: 'Grapeshot', count: 2, maxCount: 2, radius: '15 ft sphere', effect: 'Deals 3d8 shrapnel fire & piercing damage (DC 15 Dex save for half).' },
+      { name: 'Northern Wind', count: 1, maxCount: 1, radius: '10 ft sphere', effect: 'Glacial cryo-blast: Targets must succeed DC 15 Con save or be Frozen in ice for 1 round (attacks against frozen targets deal double damage!).' },
+    ],
+    oils: [
+      { name: 'Relict Oil', targetCategory: 'Relicts (Leshen, Chort)', bonusDamage: '+1d8 damage', charges: 10, maxCharges: 10 },
+      { name: 'Beast Oil', targetCategory: 'Beasts & Werewolves', bonusDamage: '+1d8 damage', charges: 10, maxCharges: 10 },
+      { name: 'Ogroid Oil', targetCategory: 'Cyclopes & Trolls', bonusDamage: '+1d8 damage', charges: 10, maxCharges: 10 },
+    ],
+    signs: ['Aard', 'Igni', 'Quen', 'Yrden', 'Axii'],
+    backstory: 'From the frozen peaks of the Amell mountains and the fortress of Haern Caduch came the Bear School witchers—isolated, independent survivalists accustomed to fighting alone against frost giants, chorts, and dracolizards. Bram came down into the fertile valleys of Cintra seeking bounties to purchase raw silver ingots for the mountain forge. He has little patience for grand speeches, but in a brawl there is no steadier ally.',
+    appearance: 'A towering, bearded wall of muscle and scarred skin, bundled in layered chainmail beneath a heavy bear-pelt mantle. A heavy silver bear medallion sits broad upon his chest. He carries his silver greatsword slung vertically across his back.',
+    flaw: 'Blunt, gruff, and slow to trust strangers; disdains flattery and courtly etiquette.',
+    ideal: 'Resilience: Only what endures the storm deserves to stand.',
+    bond: 'Carries a bear tooth amulet from the mountain beast he killed during his lone winter trial in Haern Caduch.',
+    avatarUrl: '/assets/characters/bear.jpg',
+  },
+];
