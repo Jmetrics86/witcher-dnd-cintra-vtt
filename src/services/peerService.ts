@@ -1,47 +1,190 @@
 import Peer, { DataConnection } from 'peerjs';
 import { P2PPacket } from '../types';
+import {
+  deriveSignalingPeerId,
+  deriveAesGcmKey,
+  generateRandomNonce,
+  computeChallengeProof,
+  encryptPacket,
+  decryptPacket,
+  validateAndSanitizePacket,
+  sanitizeRoomCode,
+  SecureP2PEnvelope,
+  HandshakeFrame,
+} from '../utils/cryptoSecurity';
+
+export interface ConnectedPeerInfo {
+  peerId: string;
+  playerName: string;
+  school?: string;
+  joinedAt: number;
+  latencyMs?: number;
+  isEncrypted: boolean;
+}
+
+const MAX_PLAYERS = 4; // Up to 4 Witchers (Wolf, Cat, Griffin, Bear)
+const RATE_LIMIT_WINDOW_MS = 1000;
+const MAX_PACKETS_PER_SEC = 25;
+const MAX_CLIENT_PAYLOAD_BYTES = 65536; // 64 KB max from a client
+const CONNECTION_TIMEOUT_MS = 12000; // 12 seconds
+
+const ICE_SERVERS: RTCIceServer[] = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:stun.cloudflare.com:3478' },
+];
 
 export class P2PManager {
   private peer: Peer | null = null;
   private connections: Map<string, DataConnection> = new Map();
+  private authenticatedPeers: Map<string, ConnectedPeerInfo> = new Map();
+  private pendingChallenges: Map<string, string> = new Map();
+  private rateLimitCounters: Map<string, { count: number; resetAt: number }> = new Map();
+  private seenNonces: Set<string> = new Set();
+  private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+
   private hostConnection: DataConnection | null = null;
+  private roomKey: CryptoKey | null = null;
+  private currentRoomCode: string = '';
+  private currentRoomPin: string = '';
+
   public myPeerId: string = '';
   public isHost: boolean = false;
   public isConnected: boolean = false;
+  public isRoomLocked: boolean = false;
+  public hasPinProtection: boolean = false;
 
   private onPacketCallback: ((packet: P2PPacket) => void) | null = null;
   private onPeerCountCallback: ((count: number) => void) | null = null;
   private onStatusChangeCallback: ((status: string) => void) | null = null;
+  private onPeersUpdateCallback: ((peers: ConnectedPeerInfo[]) => void) | null = null;
 
   public setCallbacks(
     onPacket: (packet: P2PPacket) => void,
     onPeerCount?: (count: number) => void,
-    onStatusChange?: (status: string) => void
+    onStatusChange?: (status: string) => void,
+    onPeersUpdate?: (peers: ConnectedPeerInfo[]) => void
   ) {
     this.onPacketCallback = onPacket;
     this.onPeerCountCallback = onPeerCount || null;
     this.onStatusChangeCallback = onStatusChange || null;
+    this.onPeersUpdateCallback = onPeersUpdate || null;
   }
 
-  // Host a game room
-  public async hostRoom(roomCode: string): Promise<string> {
+  private notifyPeersUpdated() {
+    const list = Array.from(this.authenticatedPeers.values());
+    this.onPeerCountCallback?.(this.isHost ? list.length : this.isConnected ? 1 : 0);
+    this.onPeersUpdateCallback?.(list);
+  }
+
+  public setRoomLocked(locked: boolean) {
+    this.isRoomLocked = locked;
+    if (this.isHost && this.isConnected) {
+      this.onStatusChangeCallback?.(
+        locked
+          ? `Room Locked (${this.authenticatedPeers.size}/${MAX_PLAYERS} Witchers)`
+          : `Hosting Secure Room: ${this.currentRoomCode} (${this.authenticatedPeers.size}/${MAX_PLAYERS} Witchers)`
+      );
+    }
+  }
+
+  public kickPeer(peerId: string, reason: string = 'Removed from session by Game Master') {
+    if (!this.isHost) return;
+    const conn = this.connections.get(peerId);
+    const peerInfo = this.authenticatedPeers.get(peerId);
+
+    if (conn && conn.open) {
+      const kickFrame: HandshakeFrame = {
+        _witcherHandshake: true,
+        step: 'KICK_NOTICE',
+        reason,
+        ts: Date.now(),
+      };
+      try {
+        conn.send(kickFrame);
+      } catch {
+        // Ignore send errors on kick
+      }
+      setTimeout(() => {
+        try {
+          conn.close();
+        } catch {
+          // Ignore close errors
+        }
+      }, 150);
+    }
+
+    this.connections.delete(peerId);
+    this.authenticatedPeers.delete(peerId);
+    this.pendingChallenges.delete(peerId);
+    this.rateLimitCounters.delete(peerId);
+    this.notifyPeersUpdated();
+
+    if (peerInfo) {
+      this.onStatusChangeCallback?.(`Kicked ${peerInfo.playerName} from session.`);
+    }
+  }
+
+  public getRoomInfo() {
+    return {
+      roomCode: this.currentRoomCode,
+      hasPin: this.hasPinProtection,
+      isLocked: this.isRoomLocked,
+      maxPlayers: MAX_PLAYERS,
+    };
+  }
+
+  // Host a game room with optional PIN/Passphrase and AES-256-GCM encryption
+  public async hostRoom(roomCode: string, pin: string = ''): Promise<string> {
     this.disconnect();
     this.isHost = true;
-    const cleanRoom = roomCode.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-    const peerId = `witcher-cintra-${cleanRoom}`;
+    const cleanRoom = sanitizeRoomCode(roomCode);
+    if (!cleanRoom) {
+      throw new Error('Please enter a valid alphanumeric room code.');
+    }
+
+    this.currentRoomCode = cleanRoom;
+    this.currentRoomPin = pin.trim();
+    this.hasPinProtection = Boolean(this.currentRoomPin);
+
+    // Derive obfuscated signaling ID and AES-256-GCM encryption key
+    const signalingPeerId = await deriveSignalingPeerId(cleanRoom, this.currentRoomPin);
+    this.roomKey = await deriveAesGcmKey(cleanRoom, this.currentRoomPin);
 
     return new Promise((resolve, reject) => {
-      this.onStatusChangeCallback?.('Connecting to P2P network as Game Master...');
-      
+      this.onStatusChangeCallback?.('Initializing encrypted WebRTC host session...');
+
+      let settled = false;
+      const timeoutId = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          this.disconnect();
+          const err = new Error('Signaling broker timed out. Check your network or firewall.');
+          this.onStatusChangeCallback?.(err.message);
+          reject(err);
+        }
+      }, CONNECTION_TIMEOUT_MS);
+
       try {
-        this.peer = new Peer(peerId, {
+        this.peer = new Peer(signalingPeerId, {
           debug: 1,
+          secure: true,
+          config: {
+            iceServers: ICE_SERVERS,
+          },
         });
 
         this.peer.on('open', (id) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeoutId);
           this.myPeerId = id;
           this.isConnected = true;
-          this.onStatusChangeCallback?.(`Hosting Room: ${cleanRoom}`);
+          this.startHeartbeat();
+          this.onStatusChangeCallback?.(
+            `Hosting Secure Room: ${cleanRoom}${this.hasPinProtection ? ' (PIN + AES-256)' : ' (AES-256)'}`
+          );
           resolve(id);
         });
 
@@ -49,71 +192,327 @@ export class P2PManager {
           this.setupHostConnection(conn);
         });
 
+        this.peer.on('disconnected', () => {
+          if (this.peer && !this.peer.destroyed) {
+            this.onStatusChangeCallback?.('Signaling reconnecting...');
+            this.peer.reconnect();
+          }
+        });
+
         this.peer.on('error', (err: any) => {
+          clearTimeout(timeoutId);
           console.warn('Peer error (host):', err);
           if (err.type === 'unavailable-id') {
-            this.onStatusChangeCallback?.('Room code already in use! Try a different code.');
+            this.onStatusChangeCallback?.('Room code + PIN combination is already active! Choose another.');
           } else {
             this.onStatusChangeCallback?.(`P2P Status: ${err.type || 'Offline mode active'}`);
           }
-          reject(err);
+          if (!settled) {
+            settled = true;
+            reject(err);
+          }
         });
       } catch (err) {
+        clearTimeout(timeoutId);
         console.error('Failed to init host peer:', err);
-        reject(err);
+        if (!settled) {
+          settled = true;
+          reject(err);
+        }
       }
     });
   }
 
+  private checkRateLimit(peerId: string): boolean {
+    const now = Date.now();
+    const record = this.rateLimitCounters.get(peerId);
+    if (!record || now > record.resetAt) {
+      this.rateLimitCounters.set(peerId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+      return true;
+    }
+    record.count += 1;
+    return record.count <= MAX_PACKETS_PER_SEC;
+  }
+
   private setupHostConnection(conn: DataConnection) {
+    const remotePeerId = conn.peer;
+
     conn.on('open', () => {
-      this.connections.set(conn.peer, conn);
-      this.onPeerCountCallback?.(this.connections.size);
-      this.onStatusChangeCallback?.(`Player connected! (${this.connections.size} peers)`);
+      // 1. Check if Room is Locked by GM
+      if (this.isRoomLocked) {
+        const rejectFrame: HandshakeFrame = {
+          _witcherHandshake: true,
+          step: 'AUTH_REJECT',
+          reason: 'Room is currently locked by the Game Master.',
+          ts: Date.now(),
+        };
+        conn.send(rejectFrame);
+        setTimeout(() => conn.close(), 250);
+        return;
+      }
+
+      // 2. Check 4-Witcher Party Capacity
+      if (this.authenticatedPeers.size >= MAX_PLAYERS) {
+        const rejectFrame: HandshakeFrame = {
+          _witcherHandshake: true,
+          step: 'AUTH_REJECT',
+          reason: `Witcher party is full (${MAX_PLAYERS}/${MAX_PLAYERS} players connected).`,
+          ts: Date.now(),
+        };
+        conn.send(rejectFrame);
+        setTimeout(() => conn.close(), 250);
+        return;
+      }
+
+      // 3. Issue Cryptographic Challenge-Response Handshake
+      const challenge = generateRandomNonce();
+      this.pendingChallenges.set(remotePeerId, challenge);
+      this.connections.set(remotePeerId, conn);
+
+      const challengeFrame: HandshakeFrame = {
+        _witcherHandshake: true,
+        step: 'AUTH_CHALLENGE',
+        challenge,
+        ts: Date.now(),
+      };
+      conn.send(challengeFrame);
+
+      // Disconnect unauthenticated peers after 8 seconds
+      setTimeout(() => {
+        if (this.pendingChallenges.has(remotePeerId) && !this.authenticatedPeers.has(remotePeerId)) {
+          this.pendingChallenges.delete(remotePeerId);
+          this.connections.delete(remotePeerId);
+          try {
+            conn.close();
+          } catch {
+            // ignore
+          }
+        }
+      }, 8000);
     });
 
-    conn.on('data', (data: any) => {
+    conn.on('data', async (data: any) => {
       try {
-        const packet = data as P2PPacket;
-        this.onPacketCallback?.(packet);
-        // Relay packet to other connected peers (except sender)
-        this.broadcast(packet, conn.peer);
+        // Rate limit check per peer
+        if (!this.checkRateLimit(remotePeerId)) {
+          console.warn(`Rate limit exceeded by peer ${remotePeerId}`);
+          return;
+        }
+
+        // Payload size guard for clients
+        const serializedSize = JSON.stringify(data || {}).length;
+        if (serializedSize > MAX_CLIENT_PAYLOAD_BYTES) {
+          console.warn(`Dropped oversized packet (${serializedSize} bytes) from ${remotePeerId}`);
+          return;
+        }
+
+        // Handle Handshake Frames
+        if (data && data._witcherHandshake === true) {
+          const frame = data as HandshakeFrame;
+
+          if (frame.step === 'HEARTBEAT_PONG') {
+            const peerInfo = this.authenticatedPeers.get(remotePeerId);
+            if (peerInfo && frame.ts) {
+              peerInfo.latencyMs = Math.max(1, Date.now() - frame.ts);
+              this.notifyPeersUpdated();
+            }
+            return;
+          }
+
+          if (frame.step === 'AUTH_RESPONSE') {
+            const expectedChallenge = this.pendingChallenges.get(remotePeerId);
+            if (!expectedChallenge) {
+              conn.close();
+              return;
+            }
+
+            const expectedProof = await computeChallengeProof(
+              this.currentRoomCode,
+              this.currentRoomPin,
+              expectedChallenge,
+              remotePeerId
+            );
+
+            if (frame.proof !== expectedProof) {
+              const rejectFrame: HandshakeFrame = {
+                _witcherHandshake: true,
+                step: 'AUTH_REJECT',
+                reason: 'Authentication failed: Invalid Room PIN or Passphrase.',
+                ts: Date.now(),
+              };
+              conn.send(rejectFrame);
+              this.pendingChallenges.delete(remotePeerId);
+              this.connections.delete(remotePeerId);
+              setTimeout(() => conn.close(), 250);
+              return;
+            }
+
+            // Authentication succeeded!
+            this.pendingChallenges.delete(remotePeerId);
+            const cleanName = (frame.playerName || 'Witcher Companion').slice(0, 50);
+            const peerInfo: ConnectedPeerInfo = {
+              peerId: remotePeerId,
+              playerName: cleanName,
+              school: frame.school,
+              joinedAt: Date.now(),
+              isEncrypted: Boolean(this.roomKey),
+            };
+            this.authenticatedPeers.set(remotePeerId, peerInfo);
+            this.notifyPeersUpdated();
+            this.onStatusChangeCallback?.(
+              `${cleanName} authenticated (${this.authenticatedPeers.size}/${MAX_PLAYERS} Witchers)`
+            );
+
+            const successFrame: HandshakeFrame = {
+              _witcherHandshake: true,
+              step: 'AUTH_SUCCESS',
+              ts: Date.now(),
+            };
+            conn.send(successFrame);
+
+            // Trigger PLAYER_JOIN locally and broadcast so Host sends INITIAL_STATE_SYNC
+            const joinPacket: P2PPacket = {
+              type: 'PLAYER_JOIN',
+              senderId: remotePeerId,
+              senderName: cleanName,
+              payload: { message: `${cleanName} joined the Witcher party (Verified E2EE).` },
+              timestamp: Date.now(),
+            };
+            this.onPacketCallback?.(joinPacket);
+            await this.broadcast(joinPacket, remotePeerId);
+          }
+          return;
+        }
+
+        // Reject any game packets from unauthenticated peers
+        if (!this.authenticatedPeers.has(remotePeerId)) {
+          console.warn(`Dropped packet from unauthenticated peer ${remotePeerId}`);
+          return;
+        }
+
+        // Decrypt if wrapped in SecureP2PEnvelope
+        let rawPacket: P2PPacket | null = null;
+        if (data && data._witcherSecure === true) {
+          const envelope = data as SecureP2PEnvelope;
+          if (this.seenNonces.has(envelope.nonce)) {
+            console.warn('Dropped replayed P2P packet nonce:', envelope.nonce);
+            return;
+          }
+          this.seenNonces.add(envelope.nonce);
+          if (this.seenNonces.size > 2000) {
+            const firstNonce = this.seenNonces.values().next().value;
+            if (firstNonce) this.seenNonces.delete(firstNonce);
+          }
+
+          rawPacket = await decryptPacket(envelope, this.roomKey);
+          if (!rawPacket) {
+            console.warn(`Failed to decrypt packet from peer ${remotePeerId}`);
+            return;
+          }
+        } else if (!this.roomKey) {
+          rawPacket = data as P2PPacket;
+        } else {
+          console.warn(`Dropped unencrypted packet in encrypted room from ${remotePeerId}`);
+          return;
+        }
+
+        // Validate schema & enforce Role-Based Access Control (isFromHost = false)
+        const validation = validateAndSanitizePacket(rawPacket, false);
+        if (!validation.valid || !validation.packet) {
+          console.warn(`Rejected invalid packet from ${remotePeerId}: ${validation.reason}`);
+          return;
+        }
+
+        // Update peer's character/school info if they sent a roll or chat
+        if (validation.packet.payload?.school) {
+          const info = this.authenticatedPeers.get(remotePeerId);
+          if (info) {
+            info.school = validation.packet.payload.school;
+            this.notifyPeersUpdated();
+          }
+        }
+
+        // Execute on Host and relay to other authenticated peers
+        this.onPacketCallback?.(validation.packet);
+        await this.broadcast(validation.packet, remotePeerId);
       } catch (e) {
         console.error('Error handling host data:', e);
       }
     });
 
-    conn.on('close', () => {
-      this.connections.delete(conn.peer);
-      this.onPeerCountCallback?.(this.connections.size);
-      this.onStatusChangeCallback?.(`Player disconnected. (${this.connections.size} peers)`);
-    });
+    const handleDisconnect = () => {
+      const peerInfo = this.authenticatedPeers.get(remotePeerId);
+      this.connections.delete(remotePeerId);
+      this.authenticatedPeers.delete(remotePeerId);
+      this.pendingChallenges.delete(remotePeerId);
+      this.rateLimitCounters.delete(remotePeerId);
+      this.notifyPeersUpdated();
 
+      if (peerInfo) {
+        this.onStatusChangeCallback?.(
+          `${peerInfo.playerName} disconnected (${this.authenticatedPeers.size}/${MAX_PLAYERS} Witchers)`
+        );
+      }
+    };
+
+    conn.on('close', handleDisconnect);
     conn.on('error', (err) => {
       console.warn('Host connection error:', err);
-      this.connections.delete(conn.peer);
-      this.onPeerCountCallback?.(this.connections.size);
+      handleDisconnect();
     });
   }
 
-  // Join an existing room
-  public async joinRoom(roomCode: string, playerName: string): Promise<string> {
+  // Join an existing room with optional PIN/Passphrase
+  public async joinRoom(
+    roomCode: string,
+    playerName: string,
+    pin: string = '',
+    school?: string
+  ): Promise<string> {
     this.disconnect();
     this.isHost = false;
-    const cleanRoom = roomCode.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-    const targetHostId = `witcher-cintra-${cleanRoom}`;
+    const cleanRoom = sanitizeRoomCode(roomCode);
+    if (!cleanRoom) {
+      throw new Error('Please enter a valid room code.');
+    }
+
+    this.currentRoomCode = cleanRoom;
+    this.currentRoomPin = pin.trim();
+    this.hasPinProtection = Boolean(this.currentRoomPin);
+
+    const targetHostId = await deriveSignalingPeerId(cleanRoom, this.currentRoomPin);
+    this.roomKey = await deriveAesGcmKey(cleanRoom, this.currentRoomPin);
 
     return new Promise((resolve, reject) => {
-      this.onStatusChangeCallback?.('Connecting to P2P network...');
+      this.onStatusChangeCallback?.('Connecting to encrypted P2P network...');
+
+      let settled = false;
+      const timeoutId = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          this.disconnect();
+          const err = new Error(
+            this.hasPinProtection
+              ? 'Connection timed out. Verify both the Room Code and Room PIN match the Game Master.'
+              : 'Connection timed out. Ensure the Game Master is actively hosting this Room Code.'
+          );
+          this.onStatusChangeCallback?.(err.message);
+          reject(err);
+        }
+      }, CONNECTION_TIMEOUT_MS);
 
       try {
         this.peer = new Peer({
           debug: 1,
+          secure: true,
+          config: {
+            iceServers: ICE_SERVERS,
+          },
         });
 
         this.peer.on('open', (myId) => {
           this.myPeerId = myId;
-          this.onStatusChangeCallback?.(`Connecting to Host (${cleanRoom})...`);
+          this.onStatusChangeCallback?.(`Authenticating with Game Master (${cleanRoom})...`);
 
           const conn = this.peer!.connect(targetHostId, {
             reliable: true,
@@ -121,100 +520,271 @@ export class P2PManager {
 
           this.hostConnection = conn;
 
-          conn.on('open', () => {
-            this.isConnected = true;
-            this.onStatusChangeCallback?.(`Connected to Game Master! Room: ${cleanRoom}`);
-            this.onPeerCountCallback?.(1);
-
-            // Announce join
-            this.send({
-              type: 'PLAYER_JOIN',
-              senderId: myId,
-              senderName: playerName,
-              payload: { message: `${playerName} has joined the Witcher party.` },
-              timestamp: Date.now(),
-            });
-
-            resolve(myId);
-          });
-
-          conn.on('data', (data: any) => {
+          conn.on('data', async (data: any) => {
             try {
-              const packet = data as P2PPacket;
-              this.onPacketCallback?.(packet);
+              // Handle Handshake & Heartbeat frames from Host
+              if (data && data._witcherHandshake === true) {
+                const frame = data as HandshakeFrame;
+
+                if (frame.step === 'HEARTBEAT_PING') {
+                  const pongFrame: HandshakeFrame = {
+                    _witcherHandshake: true,
+                    step: 'HEARTBEAT_PONG',
+                    ts: frame.ts,
+                  };
+                  conn.send(pongFrame);
+                  return;
+                }
+
+                if (frame.step === 'AUTH_CHALLENGE' && frame.challenge) {
+                  const proof = await computeChallengeProof(
+                    cleanRoom,
+                    this.currentRoomPin,
+                    frame.challenge,
+                    myId
+                  );
+                  const responseFrame: HandshakeFrame = {
+                    _witcherHandshake: true,
+                    step: 'AUTH_RESPONSE',
+                    proof,
+                    playerName: playerName.trim() || 'Witcher Companion',
+                    school,
+                    ts: Date.now(),
+                  };
+                  conn.send(responseFrame);
+                  return;
+                }
+
+                if (frame.step === 'AUTH_SUCCESS') {
+                  if (!settled) {
+                    settled = true;
+                    clearTimeout(timeoutId);
+                    this.isConnected = true;
+                    this.authenticatedPeers.set(targetHostId, {
+                      peerId: targetHostId,
+                      playerName: 'Game Master (Host)',
+                      joinedAt: Date.now(),
+                      isEncrypted: Boolean(this.roomKey),
+                    });
+                    this.notifyPeersUpdated();
+                    this.onStatusChangeCallback?.(
+                      `Connected & Verified! Room: ${cleanRoom} (AES-256-GCM)`
+                    );
+                    resolve(myId);
+                  }
+                  return;
+                }
+
+                if (frame.step === 'AUTH_REJECT') {
+                  clearTimeout(timeoutId);
+                  const errMsg = frame.reason || 'Connection rejected by Game Master.';
+                  this.onStatusChangeCallback?.(errMsg);
+                  this.disconnect();
+                  if (!settled) {
+                    settled = true;
+                    reject(new Error(errMsg));
+                  }
+                  return;
+                }
+
+                if (frame.step === 'KICK_NOTICE') {
+                  const kickMsg = frame.reason || 'You were removed from the session by the Game Master.';
+                  this.onStatusChangeCallback?.(kickMsg);
+                  this.disconnect();
+                  return;
+                }
+                return;
+              }
+
+              // Decrypt incoming game packet from Host
+              let rawPacket: P2PPacket | null = null;
+              if (data && data._witcherSecure === true) {
+                const envelope = data as SecureP2PEnvelope;
+                if (this.seenNonces.has(envelope.nonce)) return;
+                this.seenNonces.add(envelope.nonce);
+                rawPacket = await decryptPacket(envelope, this.roomKey);
+                if (!rawPacket) return;
+              } else if (!this.roomKey) {
+                rawPacket = data as P2PPacket;
+              } else {
+                return;
+              }
+
+              // Validate packet from Host (isFromHost = true)
+              const validation = validateAndSanitizePacket(rawPacket, true);
+              if (validation.valid && validation.packet) {
+                this.onPacketCallback?.(validation.packet);
+              }
             } catch (e) {
               console.error('Error handling client data:', e);
             }
           });
 
           conn.on('close', () => {
+            clearTimeout(timeoutId);
             this.isConnected = false;
+            this.authenticatedPeers.clear();
+            this.notifyPeersUpdated();
             this.onStatusChangeCallback?.('Disconnected from Game Master.');
-            this.onPeerCountCallback?.(0);
+            if (!settled) {
+              settled = true;
+              reject(new Error('Connection closed by Host.'));
+            }
           });
 
           conn.on('error', (err) => {
+            clearTimeout(timeoutId);
             console.warn('Client connection error:', err);
-            this.onStatusChangeCallback?.(`Connection error: ${err.message || 'Host not found'}`);
-            reject(err);
+            this.onStatusChangeCallback?.(`Connection error: ${err.message || 'Host unreachable'}`);
+            if (!settled) {
+              settled = true;
+              reject(err);
+            }
           });
         });
 
-        this.peer.on('error', (err) => {
+        this.peer.on('error', (err: any) => {
+          clearTimeout(timeoutId);
           console.warn('Peer error (client):', err);
-          this.onStatusChangeCallback?.(`P2P error: ${err.type || 'Connection failed'}`);
-          reject(err);
+          const msg =
+            err.type === 'peer-unavailable'
+              ? this.hasPinProtection
+                ? 'Room not found. Double-check both the Room Code and the Secret PIN!'
+                : 'Room not found. Make sure the Game Master has started hosting.'
+              : `P2P error: ${err.type || 'Connection failed'}`;
+          this.onStatusChangeCallback?.(msg);
+          if (!settled) {
+            settled = true;
+            reject(new Error(msg));
+          }
         });
       } catch (err) {
+        clearTimeout(timeoutId);
         console.error('Failed to init client peer:', err);
-        reject(err);
-      }
-    });
-  }
-
-  // Send packet to everyone (if host) or to host (if client)
-  public send(packet: P2PPacket) {
-    if (this.isHost) {
-      this.broadcast(packet);
-    } else if (this.hostConnection && this.hostConnection.open) {
-      this.hostConnection.send(packet);
-    }
-  }
-
-  // Broadcast to all connected clients (host only)
-  private broadcast(packet: P2PPacket, excludePeerId?: string) {
-    this.connections.forEach((conn, peerId) => {
-      if (peerId !== excludePeerId && conn.open) {
-        try {
-          conn.send(packet);
-        } catch (e) {
-          console.error(`Failed to send to peer ${peerId}:`, e);
+        if (!settled) {
+          settled = true;
+          reject(err);
         }
       }
     });
   }
 
+  private startHeartbeat() {
+    this.stopHeartbeat();
+    this.heartbeatInterval = setInterval(() => {
+      if (!this.isHost) return;
+      const pingFrame: HandshakeFrame = {
+        _witcherHandshake: true,
+        step: 'HEARTBEAT_PING',
+        ts: Date.now(),
+      };
+      this.authenticatedPeers.forEach((_, peerId) => {
+        const conn = this.connections.get(peerId);
+        if (conn && conn.open) {
+          try {
+            conn.send(pingFrame);
+          } catch {
+            // ignore
+          }
+        }
+      });
+    }, 10000);
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
+  // Encrypt & send packet to everyone (if host) or to host (if client)
+  public async send(packet: P2PPacket) {
+    if (!this.isConnected) return;
+
+    if (this.isHost) {
+      await this.broadcast(packet);
+    } else if (this.hostConnection && this.hostConnection.open) {
+      try {
+        const framed = await encryptPacket(packet, this.roomKey);
+        this.hostConnection.send(framed);
+      } catch (err) {
+        console.error('Failed to encrypt/send client packet:', err);
+      }
+    }
+  }
+
+  // Broadcast encrypted packet to all authenticated clients (host only)
+  private async broadcast(packet: P2PPacket, excludePeerId?: string) {
+    if (!this.isHost) return;
+    try {
+      const framed = await encryptPacket(packet, this.roomKey);
+      this.authenticatedPeers.forEach((_, peerId) => {
+        if (peerId !== excludePeerId) {
+          const conn = this.connections.get(peerId);
+          if (conn && conn.open) {
+            try {
+              conn.send(framed);
+            } catch (e) {
+              console.error(`Failed to send to peer ${peerId}:`, e);
+            }
+          }
+        }
+      });
+    } catch (err) {
+      console.error('Failed to broadcast encrypted packet:', err);
+    }
+  }
+
   public getConnectedPeerCount(): number {
-    if (this.isHost) return this.connections.size;
+    if (this.isHost) return this.authenticatedPeers.size;
     return this.isConnected ? 1 : 0;
   }
 
+  public getConnectedPeers(): ConnectedPeerInfo[] {
+    return Array.from(this.authenticatedPeers.values());
+  }
+
   public disconnect() {
+    this.stopHeartbeat();
+
     if (this.hostConnection) {
-      this.hostConnection.close();
+      try {
+        this.hostConnection.close();
+      } catch {
+        // ignore
+      }
       this.hostConnection = null;
     }
-    this.connections.forEach((conn) => conn.close());
+
+    this.connections.forEach((conn) => {
+      try {
+        conn.close();
+      } catch {
+        // ignore
+      }
+    });
     this.connections.clear();
+    this.authenticatedPeers.clear();
+    this.pendingChallenges.clear();
+    this.rateLimitCounters.clear();
+    this.seenNonces.clear();
 
     if (this.peer) {
-      this.peer.destroy();
+      try {
+        this.peer.destroy();
+      } catch {
+        // ignore
+      }
       this.peer = null;
     }
 
+    this.roomKey = null;
     this.isConnected = false;
     this.isHost = false;
+    this.isRoomLocked = false;
     this.myPeerId = '';
+    this.notifyPeersUpdated();
   }
 }
 

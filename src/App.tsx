@@ -24,7 +24,7 @@ import {
 } from './types';
 import { PREGEN_WITCHERS } from './data/characters';
 import { MAP_SCENES } from './data/maps';
-import { p2pManager } from './services/peerService';
+import { p2pManager, ConnectedPeerInfo } from './services/peerService';
 import { playCriticalHitSound } from './utils/audio';
 
 const getDefaultTokens = (): MapToken[] => [
@@ -116,7 +116,20 @@ export const App: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [isHost, setIsHost] = useState(false);
   const [peerCount, setPeerCount] = useState(0);
+  const [connectedPeers, setConnectedPeers] = useState<ConnectedPeerInfo[]>([]);
+  const [isRoomLocked, setIsRoomLocked] = useState(false);
   const [statusText, setStatusText] = useState('P2P Standby (Offline Ready)');
+  const [initialRoomFromUrl, setInitialRoomFromUrl] = useState<string | undefined>(undefined);
+
+  // Detect ?room= invite link parameter on load
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const roomParam = params.get('room');
+    if (roomParam && roomParam.trim()) {
+      setInitialRoomFromUrl(roomParam.trim());
+      setIsP2PModalOpen(true);
+    }
+  }, []);
 
   // Ping state
   const [pingLocation, setPingLocation] = useState<{ x: number; y: number } | null>(null);
@@ -267,20 +280,22 @@ export const App: React.FC = () => {
     p2pManager.setCallbacks(
       handleP2PPacket,
       (count) => setPeerCount(count),
-      (status) => setStatusText(status)
+      (status) => setStatusText(status),
+      (peers) => setConnectedPeers(peers)
     );
   }, [handleP2PPacket]);
 
   // Connect as Host
-  const handleConnectHost = async (roomCode: string) => {
-    await p2pManager.hostRoom(roomCode);
+  const handleConnectHost = async (roomCode: string, pin: string = '') => {
+    await p2pManager.hostRoom(roomCode, pin);
     setIsHost(true);
     setIsConnected(true);
+    setIsRoomLocked(false);
   };
 
   // Connect as Client
-  const handleConnectClient = async (roomCode: string, name: string) => {
-    await p2pManager.joinRoom(roomCode, name);
+  const handleConnectClient = async (roomCode: string, name: string, pin: string = '') => {
+    await p2pManager.joinRoom(roomCode, name, pin, selectedCharacter.school);
     setIsHost(false);
     setIsConnected(true);
   };
@@ -291,7 +306,20 @@ export const App: React.FC = () => {
     setIsHost(false);
     setIsConnected(false);
     setPeerCount(0);
+    setConnectedPeers([]);
+    setIsRoomLocked(false);
     setStatusText('Disconnected');
+  };
+
+  // Kick Peer (Host Only)
+  const handleKickPeer = (peerId: string) => {
+    p2pManager.kickPeer(peerId);
+  };
+
+  // Toggle Room Lock (Host Only)
+  const handleToggleRoomLock = (locked: boolean) => {
+    p2pManager.setRoomLocked(locked);
+    setIsRoomLocked(locked);
   };
 
   // Roll Dice Action
@@ -725,11 +753,17 @@ export const App: React.FC = () => {
         isHost={isHost}
         isConnected={isConnected}
         peerCount={peerCount}
+        connectedPeers={connectedPeers}
         statusText={statusText}
         onConnectHost={handleConnectHost}
         onConnectClient={handleConnectClient}
         onDisconnect={handleDisconnect}
+        onKickPeer={handleKickPeer}
+        isRoomLocked={isRoomLocked}
+        onToggleRoomLock={handleToggleRoomLock}
+        onForceSyncPeers={handleForceSyncPeers}
         playerName={selectedCharacter.name}
+        initialRoomFromUrl={initialRoomFromUrl}
       />
 
       {/* Bestiary Modal (Overlay) */}
