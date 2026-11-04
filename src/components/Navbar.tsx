@@ -9,7 +9,8 @@ import {
   WifiOff, 
   Sparkles,
   Map as MapIcon,
-  FileText
+  FileText,
+  HardDrive
 } from 'lucide-react';
 import { WitcherCharacter, MapScene } from '../types';
 
@@ -25,6 +26,7 @@ interface NavbarProps {
   onOpenBestiaryModal: () => void;
   onOpenCharacterSelect: () => void;
   onOpenNotionModal: () => void;
+  onOpenGMModal: () => void;
   onToggleDiceTray: () => void;
   isDiceTrayOpen: boolean;
   activeTab: 'map' | 'sheet' | 'bestiary' | 'guide';
@@ -43,6 +45,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenBestiaryModal,
   onOpenCharacterSelect,
   onOpenNotionModal,
+  onOpenGMModal,
   onToggleDiceTray,
   isDiceTrayOpen,
   activeTab,
@@ -157,6 +160,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {peerCount + (isHost ? 1 : 0)}p
               </span>
             )}
+          </button>
+
+          {/* GM Local Storage & Backup Button */}
+          <button
+            onClick={onOpenGMModal}
+            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-md bg-[#191c1f] border border-[#2b3136] text-[#a6b1b9] hover:text-white hover:border-[#c99a45] transition-all flex items-center gap-1.5 text-xs font-cinzel"
+            title="Campaign Auto-Save & Local Backup"
+          >
+            <HardDrive className="w-3.5 h-3.5 text-[#c99a45]" />
+            <span className="hidden xl:inline">GM Save</span>
           </button>
 
           {/* Switch Witcher Button */}

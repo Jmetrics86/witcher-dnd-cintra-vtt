@@ -1,4 +1,5 @@
 import { WitcherCharacter } from '../types';
+import { getAssetUrl } from '../utils/assets';
 
 export const PREGEN_WITCHERS: WitcherCharacter[] = [
   {
@@ -88,7 +89,7 @@ export const PREGEN_WITCHERS: WitcherCharacter[] = [
     flaw: 'Can be overly stoic and cynical, often doubting the promises of Cintrian nobles.',
     ideal: 'The Witcher Code: Keep your word, protect the innocents from beasts, and never leave a contract unfinished.',
     bond: 'Carries a silver whetstone gifted by his mentor at Kaer Morhen; sworn to bring coin back to his brothers.',
-    avatarUrl: '/assets/characters/wolf.jpg',
+    avatarUrl: getAssetUrl('assets/characters/wolf.jpg'),
   },
   {
     id: 'witcher-cat',
@@ -176,7 +177,7 @@ export const PREGEN_WITCHERS: WitcherCharacter[] = [
     flaw: 'Prone to sudden surges of adrenaline and distrust; quick to draw steel at perceived slights.',
     ideal: 'Freedom: No master, no king, and no dogma dictates where my daggers strike.',
     bond: 'Carries a twin set of sabres engraved with the name of a fallen companion from Dyn Marv.',
-    avatarUrl: '/assets/characters/cat.jpg',
+    avatarUrl: getAssetUrl('assets/characters/cat.jpg'),
   },
   {
     id: 'witcher-griffin',
@@ -264,7 +265,7 @@ export const PREGEN_WITCHERS: WitcherCharacter[] = [
     flaw: 'Can be overly rigid and proud; struggles when forced to make morally gray compromises.',
     ideal: 'Honor & Enlightenment: Knowledge and discipline elevate us above beasts and tyrants.',
     bond: 'Carries a battered signet ring of his Cintrian forebears; vows to protect the realm from primeval horrors.',
-    avatarUrl: '/assets/characters/griffin.jpg',
+    avatarUrl: getAssetUrl('assets/characters/griffin.jpg'),
   },
   {
     id: 'witcher-bear',
@@ -350,6 +351,6 @@ export const PREGEN_WITCHERS: WitcherCharacter[] = [
     flaw: 'Blunt, gruff, and slow to trust strangers; disdains flattery and courtly etiquette.',
     ideal: 'Resilience: Only what endures the storm deserves to stand.',
     bond: 'Carries a bear tooth amulet from the mountain beast he killed during his lone winter trial in Haern Caduch.',
-    avatarUrl: '/assets/characters/bear.jpg',
+    avatarUrl: getAssetUrl('assets/characters/bear.jpg'),
   },
 ];

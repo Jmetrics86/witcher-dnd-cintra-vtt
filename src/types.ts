@@ -196,6 +196,7 @@ export interface ChatMessage {
 export interface P2PPacket {
   type: 
     | 'SYNC_STATE'
+    | 'INITIAL_STATE_SYNC'
     | 'PLAYER_JOIN'
     | 'CHAT_MESSAGE'
     | 'DICE_ROLL'

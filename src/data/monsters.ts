@@ -1,4 +1,5 @@
 import { Monster } from '../types';
+import { getAssetUrl } from '../utils/assets';
 
 export const MONSTERS: Monster[] = [
   {
@@ -56,7 +57,7 @@ export const MONSTERS: Monster[] = [
     ],
     lore: 'Ancient relicts that dwell in the deepest primeval woods of the Continent. Ancient Cintrian legends say the Leshen was worshipped by elven ancestors as a spirit of growth and merciless decay before human axes touched the forest.',
     witcherTactics: 'Essential tactics: Coat silver blades in Relict Oil. Use Igni or incendiary bombs to nullify its bark armor and exploit its double-damage fire vulnerability. Inscribe Yrden on the ground to pin down its crow teleportation. Shatter its totems immediately to end its regeneration.',
-    imageUrl: '/assets/monsters/leshen.jpg',
+    imageUrl: getAssetUrl('assets/monsters/leshen.jpg'),
   },
   {
     id: 'chort-fiend',
@@ -109,7 +110,7 @@ export const MONSTERS: Monster[] = [
     ],
     lore: 'Relict beasts of primeval size and strength. Solitary dwellers in deep ancient valleys along the Yaruga riverbed. In Cintrian folklore, chorts are called living avalanches.',
     witcherTactics: 'Dodge the charging gore using Cat agility or Wolf parry. When the third eye opens, look away or pop Quen. Coat your blade in Relict Oil and use Samum bombs to counter its rage.',
-    imageUrl: '/assets/monsters/fiend.jpg',
+    imageUrl: getAssetUrl('assets/monsters/fiend.jpg'),
   },
   {
     id: 'barghest-hound',
@@ -155,7 +156,7 @@ export const MONSTERS: Monster[] = [
     ],
     lore: 'Phantom hounds forged from lingering guilt, unavenged murders, and dark curses. In Cintra, their appearance along the roadside heralds a violent death nearby.',
     witcherTactics: 'Toss a Moon Dust bomb or lay Yrden immediately. Without their incorporeal shift, their low HP makes them quick work for silver swords coated in Specter Oil.',
-    imageUrl: '/assets/monsters/barghest.jpg',
+    imageUrl: getAssetUrl('assets/monsters/barghest.jpg'),
   },
   {
     id: 'grave-hag',
@@ -208,6 +209,6 @@ export const MONSTERS: Monster[] = [
     ],
     lore: 'Grotesque necrophages that feed upon decaying marrow inside barrows and cemeteries. They craft crude totems and can sense freshly deceased bodies from miles away.',
     witcherTactics: 'Sever the tongue when she lashes out! Coat silver weapons with Necrophage Oil and scorch her with Igni.',
-    imageUrl: '/assets/monsters/gravehag.jpg',
+    imageUrl: getAssetUrl('assets/monsters/gravehag.jpg'),
   },
 ];

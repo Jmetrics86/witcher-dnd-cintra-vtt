@@ -1,4 +1,5 @@
 import { MapScene } from '../types';
+import { getAssetUrl } from '../utils/assets';
 
 export const MAP_SCENES: MapScene[] = [
   {
@@ -7,7 +8,7 @@ export const MAP_SCENES: MapScene[] = [
     name: 'The Lion & Lily Waystation',
     subtitle: 'Act I: The Royal Contract (0:00 - 0:45)',
     description: 'A fortified roadside tavern on the great royal highway of Cintra. Rain drums against heavy timber shutters as Cintrian soldiers, traders, and four lone witchers find themselves under the same roof. A royal bounty with the golden lion seal hangs on the notice board.',
-    imageUrl: '/assets/maps/tavern.jpg',
+    imageUrl: getAssetUrl('assets/maps/tavern.jpg'),
     gridRows: 16,
     gridCols: 20,
     gmNotes: 'Act I GM Guide: Start in media res. Have Baron Raymond of Marnadal\'s bailiff, Sir Danek, enter surrounded by four Cintrian guards. 2,000 Cintrian orens offered for the head of "The Woodland Shadow" slaughtering logging convoys near the Yaruga. Let the 4 Witchers size each other up, negotiate the split of the coin, and handle a drunken Cintrian knight who spits on the floor near them.',
@@ -18,7 +19,7 @@ export const MAP_SCENES: MapScene[] = [
     name: 'The Primeval Blackwood of Cintra',
     subtitle: 'Act II: The Tracker\'s Trail (0:45 - 1:45)',
     description: 'Ancient moss-bearded oaks and towering pines blanket the misty slopes above the Yaruga river. Deep animal trails are choked with sulfurous mist. Splintered wooden timber wagons and shredded horses mark where the convoy perished.',
-    imageUrl: '/assets/maps/forest.jpg',
+    imageUrl: getAssetUrl('assets/maps/forest.jpg'),
     gridRows: 16,
     gridCols: 20,
     gmNotes: 'Act II GM Guide: Witcher Senses skill checks (DC 13). Discover gouged tree bark 10 feet in the air (Chort horns), raven feathers soaked in green ichor (Leshen presence), and freshly dug shallow graves. Combat ambush: A pack of 4 Barghest hounds materialized from the mist. Introduce Yrden & Moon Dust bomb mechanics to pin the specters.',
@@ -29,7 +30,7 @@ export const MAP_SCENES: MapScene[] = [
     name: 'The Forgotten Crypt of King Elidyr',
     subtitle: 'Act III: Secrets of the Barrow (1:45 - 2:30)',
     description: 'A subterranean barrow mound dating back to the first Cintrian kings before the great treaties. Carved stone sarcophagi line the walls, and ancient elven runes glow faint azure in the gloom. The smell of putrefaction is overpowering.',
-    imageUrl: '/assets/maps/crypt.jpg',
+    imageUrl: getAssetUrl('assets/maps/crypt.jpg'),
     gridRows: 16,
     gridCols: 20,
     gmNotes: 'Act III GM Guide: Dungeon exploration. Encounter the Marnadal Grave Hag crunching bones in the central ossuary. After defeating her, inspect the ancient altar (DC 14 Arcana/History - Alden excels here): Reveal the truth! The Baron lied—he didn\'t just send loggers; his men secretly desecrated the Sacred Grove to steal the Sun Stone of King Elidyr, awakening the Ancient Leshen\'s wrath.',
@@ -40,7 +41,7 @@ export const MAP_SCENES: MapScene[] = [
     name: 'The Corrupted Monolith Grove',
     subtitle: 'Act IV: The Climax & Monster Hunt (2:30 - 3:30)',
     description: 'A circular clearing ringed by towering moss-grown standing stones. In the center rises a petrified wooden heart tree, weeping crimson sap. Thorns and raven skeletons hang from woven effigies. The air chills until your breath mists.',
-    imageUrl: '/assets/maps/boss_grove.jpg',
+    imageUrl: getAssetUrl('assets/maps/boss_grove.jpg'),
     gridRows: 16,
     gridCols: 20,
     gmNotes: 'Act IV GM Guide: The Showdown! Phase 1: The Ancient Leshen commands the woodland, summoning crows and entangling vines. Phase 2: At 50% HP, the Leshen howls and the Primeval Chort thunders into the arena! The party must coordinate: Bear tanks the Chort with Quen, Cat flanks for massive crits, Griffin bombards the Leshen with Igni and Yrden, and Wolf coordinates tactical bomb strikes.',
