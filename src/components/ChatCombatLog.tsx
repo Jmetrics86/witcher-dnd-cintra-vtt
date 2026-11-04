@@ -112,7 +112,7 @@ export const ChatCombatLog: React.FC<ChatCombatLogProps> = ({
   };
 
   return (
-    <div className="bg-[#131517] border border-[#2e343b] rounded-xl overflow-hidden shadow-2xl flex flex-col h-full relative">
+    <div className="bg-[#131517] border border-[#2e343b] rounded-xl overflow-hidden shadow-2xl flex flex-col h-full min-h-0 relative">
       
       {/* Top Header: Title, Filters & Notion Wiki Sync */}
       <div className="bg-[#181a1d] border-b border-[#282d33] px-3.5 py-2 flex items-center justify-between gap-2">
@@ -205,7 +205,7 @@ export const ChatCombatLog: React.FC<ChatCombatLogProps> = ({
       )}
 
       {/* Messages Scroll Area */}
-      <div ref={scrollRef} className="flex-1 p-3.5 overflow-y-auto space-y-2.5 bg-[#0f1012] min-h-[220px]">
+      <div ref={scrollRef} className="flex-1 min-h-0 p-3.5 overflow-y-auto space-y-2.5 bg-[#0f1012]">
         {filteredMessages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-xs text-[#6b737d] font-cormorant italic text-center p-4">
             <Sparkles className="w-6 h-6 text-[#c99a45]/40 mb-2" />

@@ -78,7 +78,7 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
   };
 
   return (
-    <div className="bg-[#131517] border border-[#2e343b] rounded-xl overflow-hidden shadow-2xl flex flex-col h-full">
+    <div className="bg-[#131517] border border-[#2e343b] rounded-xl overflow-hidden shadow-2xl flex flex-col h-full min-h-0">
       
       {/* Top Map Bar: Scene Selector & GM Tools */}
       <div className="bg-[#181a1d] border-b border-[#282d33] px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
@@ -167,7 +167,7 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
       </div>
 
       {/* Main Interactive Map Canvas */}
-      <div className="relative flex-1 bg-[#0a0b0c] overflow-hidden select-none min-h-[460px] min-w-0">
+      <div className="relative flex-1 min-h-0 bg-[#0a0b0c] overflow-hidden select-none min-w-0">
         <div
           ref={mapRef}
           onClick={handleMapClick}
