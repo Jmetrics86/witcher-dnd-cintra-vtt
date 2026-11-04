@@ -118,6 +118,7 @@ export const App: React.FC = () => {
   // Networking state
   const [isConnected, setIsConnected] = useState(false);
   const [isHost, setIsHost] = useState(false);
+  const [gmPlaysWitcher, setGmPlaysWitcher] = useState<boolean>(true);
   const [peerCount, setPeerCount] = useState(0);
   const [connectedPeers, setConnectedPeers] = useState<ConnectedPeerInfo[]>([]);
   const [isRoomLocked, setIsRoomLocked] = useState(false);
@@ -177,8 +178,8 @@ export const App: React.FC = () => {
       return initialSave.characterAssignments;
     }
     return {
-      'char-wolf': {
-        characterId: 'char-wolf',
+      [PREGEN_WITCHERS[0].id]: {
+        characterId: PREGEN_WITCHERS[0].id,
         claimedByPeerId: 'gm',
         claimedByName: 'Game Master',
         isLocked: true,
@@ -435,11 +436,121 @@ export const App: React.FC = () => {
   }, [handleP2PPacket]);
 
   // Connect as Host
-  const handleConnectHost = async (roomCode: string, pin: string = '') => {
+  const handleConnectHost = async (
+    roomCode: string,
+    pin: string = '',
+    gmPlays: boolean = true,
+    gmCharId?: string
+  ) => {
+    p2pManager.setHostPlaysWitcher(gmPlays);
+    setGmPlaysWitcher(gmPlays);
     await p2pManager.hostRoom(roomCode, pin);
     setIsHost(true);
     setIsConnected(true);
     setIsRoomLocked(false);
+
+    if (gmPlays) {
+      const chosenId = gmCharId || selectedCharacter.id || PREGEN_WITCHERS[0].id;
+      const targetChar = PREGEN_WITCHERS.find((w) => w.id === chosenId) || PREGEN_WITCHERS[0];
+      setSelectedCharacter(targetChar);
+      setCharacterAssignments({
+        [chosenId]: {
+          characterId: chosenId,
+          claimedByPeerId: 'gm',
+          claimedByName: 'Game Master',
+          isLocked: true,
+          claimedAt: Date.now(),
+        },
+      });
+    } else {
+      // Pure Narrator: GM does not take a Witcher slot; all 4 open for players
+      setCharacterAssignments({});
+    }
+  };
+
+  // GM Toggle between Playing a Witcher and Pure Narrator
+  const handleToggleGmPlaysWitcher = (plays: boolean, characterId?: string) => {
+    if (!isHost) return;
+
+    if (plays) {
+      // "If 4 players are already in then character selection is not permitted"
+      if (connectedPeers.length >= 4) {
+        handleAddLogMessage(
+          'Party is full (4 players in session). Character selection is not permitted.',
+          'system'
+        );
+        return;
+      }
+
+      // Find first available character
+      const availableChar = PREGEN_WITCHERS.find(
+        (w) =>
+          w.id === characterId ||
+          !characterAssignments[w.id] ||
+          !characterAssignments[w.id].isLocked ||
+          characterAssignments[w.id].claimedByPeerId === 'gm'
+      );
+
+      if (!availableChar) {
+        handleAddLogMessage('No available Witcher characters left to claim.', 'system');
+        return;
+      }
+
+      const chosenId = availableChar.id;
+      setSelectedCharacter(availableChar);
+      setGmPlaysWitcher(true);
+      p2pManager.setHostPlaysWitcher(true);
+
+      const updated: Record<string, CharacterAssignment> = {
+        ...characterAssignments,
+        [chosenId]: {
+          characterId: chosenId,
+          claimedByPeerId: 'gm',
+          claimedByName: 'Game Master',
+          isLocked: true,
+          claimedAt: Date.now(),
+        },
+      };
+      setCharacterAssignments(updated);
+
+      p2pManager.send({
+        type: 'CHARACTER_ASSIGNMENT_SYNC',
+        senderId: 'gm',
+        senderName: 'Game Master',
+        payload: updated,
+        timestamp: Date.now(),
+      });
+
+      handleAddLogMessage(
+        `Game Master stepped into the party as ${availableChar.name} (School of the ${availableChar.school})!`,
+        'system'
+      );
+    } else {
+      // Switch to Pure Narrator
+      setGmPlaysWitcher(false);
+      p2pManager.setHostPlaysWitcher(false);
+
+      const updated = { ...characterAssignments };
+      Object.keys(updated).forEach((k) => {
+        if (updated[k].claimedByPeerId === 'gm') {
+          delete updated[k];
+        }
+      });
+      setCharacterAssignments(updated);
+
+      p2pManager.send({
+        type: 'CHARACTER_ASSIGNMENT_SYNC',
+        senderId: 'gm',
+        senderName: 'Game Master',
+        payload: updated,
+        timestamp: Date.now(),
+      });
+
+      handleAddLogMessage(
+        'Game Master switched to pure Narrator mode. All 4 Witcher schools are now available to players!',
+        'system'
+      );
+    }
   };
 
   // Connect as Client
@@ -907,6 +1018,7 @@ export const App: React.FC = () => {
         currentScene={currentScene}
         isConnected={isConnected}
         isHost={isHost}
+        gmPlaysWitcher={gmPlaysWitcher}
         peerCount={peerCount}
         statusText={statusText}
         isCharacterLocked={isCurrentCharacterLocked}
@@ -1037,6 +1149,10 @@ export const App: React.FC = () => {
         playerName={selectedCharacter.name}
         initialRoomFromUrl={initialRoomFromUrl}
         onOpenInstructions={() => setIsInstructionsModalOpen(true)}
+        gmPlaysWitcher={gmPlaysWitcher}
+        onToggleGmPlaysWitcher={handleToggleGmPlaysWitcher}
+        characterAssignments={characterAssignments}
+        selectedCharacterId={selectedCharacter.id}
       />
 
       {/* Bestiary Modal (Overlay) */}

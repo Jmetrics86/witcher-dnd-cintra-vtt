@@ -13,6 +13,7 @@ import {
   HardDrive,
   HelpCircle,
   Lock,
+  Crown,
 } from 'lucide-react';
 import { WitcherCharacter, MapScene } from '../types';
 
@@ -21,6 +22,7 @@ interface NavbarProps {
   currentScene: MapScene;
   isConnected: boolean;
   isHost: boolean;
+  gmPlaysWitcher?: boolean;
   peerCount: number;
   statusText: string;
   isCharacterLocked?: boolean;
@@ -42,6 +44,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentScene,
   isConnected,
   isHost,
+  gmPlaysWitcher,
   peerCount,
   statusText,
   isCharacterLocked,
@@ -194,20 +197,27 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-md bg-[#191c1f] border border-[#2b3136] text-[#c99a45] hover:bg-[#252a2f] hover:border-[#c99a45] transition-all flex items-center gap-1.5 text-xs font-cinzel"
             title={
               isHost
-                ? 'Game Master Witcher Roster & Character Reassignment'
+                ? !gmPlaysWitcher
+                  ? 'Game Master in Narrator Mode (Click to manage roster or play a Witcher)'
+                  : 'Game Master Playing Witcher (Click to manage character roster)'
                 : isCharacterLocked
                 ? 'Your character is locked. Only the GM can reassign characters.'
                 : 'Select and lock your Witcher'
             }
           >
-            {isCharacterLocked && !isHost ? (
+            {isHost && !gmPlaysWitcher ? (
+              <Crown className="w-3.5 h-3.5 text-amber-400" />
+            ) : isCharacterLocked && !isHost ? (
               <Lock className="w-3.5 h-3.5 text-amber-400" />
             ) : (
               <Users className="w-3.5 h-3.5" />
             )}
             <span className="hidden lg:inline">
-              {selectedCharacter?.school || 'Select'} Witcher{' '}
-              {isCharacterLocked && !isHost ? '(Locked)' : ''}
+              {isHost && !gmPlaysWitcher
+                ? 'GM (Narrator)'
+                : `${selectedCharacter?.school || 'Select'} Witcher ${
+                    isCharacterLocked && !isHost ? '(Locked)' : ''
+                  }`}
             </span>
           </button>
 

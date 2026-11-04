@@ -17,8 +17,13 @@ import {
   ShieldCheck,
   RefreshCw,
   HelpCircle,
+  Crown,
+  Sword,
+  AlertTriangle,
 } from 'lucide-react';
 import { ConnectedPeerInfo } from '../services/peerService';
+import { PREGEN_WITCHERS } from '../data/characters';
+import { CharacterAssignment } from '../types';
 
 interface P2PModalProps {
   isOpen: boolean;
@@ -28,7 +33,12 @@ interface P2PModalProps {
   peerCount: number;
   connectedPeers: ConnectedPeerInfo[];
   statusText: string;
-  onConnectHost: (roomCode: string, pin: string) => Promise<void>;
+  onConnectHost: (
+    roomCode: string,
+    pin: string,
+    gmPlaysWitcher: boolean,
+    gmCharacterId?: string
+  ) => Promise<void>;
   onConnectClient: (roomCode: string, playerName: string, pin: string) => Promise<void>;
   onDisconnect: () => void;
   onKickPeer: (peerId: string) => void;
@@ -38,6 +48,10 @@ interface P2PModalProps {
   playerName: string;
   initialRoomFromUrl?: string;
   onOpenInstructions?: () => void;
+  gmPlaysWitcher: boolean;
+  onToggleGmPlaysWitcher: (plays: boolean, characterId?: string) => void;
+  characterAssignments: Record<string, CharacterAssignment>;
+  selectedCharacterId?: string;
 }
 
 export const P2PModal: React.FC<P2PModalProps> = ({
@@ -58,6 +72,10 @@ export const P2PModal: React.FC<P2PModalProps> = ({
   playerName,
   initialRoomFromUrl,
   onOpenInstructions,
+  gmPlaysWitcher,
+  onToggleGmPlaysWitcher,
+  characterAssignments,
+  selectedCharacterId,
 }) => {
   const [activeMode, setActiveMode] = useState<'host' | 'join'>(
     initialRoomFromUrl ? 'join' : 'host'
@@ -70,6 +88,29 @@ export const P2PModal: React.FC<P2PModalProps> = ({
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // GM play-along role & character choice
+  const [localGmPlays, setLocalGmPlays] = useState<boolean>(gmPlaysWitcher);
+  const [localGmCharId, setLocalGmCharId] = useState<string>(
+    selectedCharacterId || PREGEN_WITCHERS[0].id
+  );
+
+  useEffect(() => {
+    setLocalGmPlays(gmPlaysWitcher);
+  }, [gmPlaysWitcher]);
+
+  useEffect(() => {
+    if (selectedCharacterId) {
+      setLocalGmCharId(selectedCharacterId);
+    }
+  }, [selectedCharacterId]);
+
+  // Check if 4 players are already in the session
+  const externalPlayersCount = isConnected ? peerCount : connectedPeers.length;
+  const claimedByOthersCount = Object.values(characterAssignments).filter(
+    (a) => a.isLocked && a.claimedByPeerId !== 'gm'
+  ).length;
+  const isPartyFullForGm = externalPlayersCount >= 4 || claimedByOthersCount >= 4;
 
   useEffect(() => {
     if (initialRoomFromUrl) {
@@ -105,7 +146,12 @@ export const P2PModal: React.FC<P2PModalProps> = ({
     setIsLoading(true);
     setErrorMsg('');
     try {
-      await onConnectHost(roomCode.trim(), roomPin.trim());
+      await onConnectHost(
+        roomCode.trim(),
+        roomPin.trim(),
+        localGmPlays,
+        localGmPlays ? localGmCharId : undefined
+      );
     } catch (err: any) {
       setErrorMsg(err?.message || 'Could not create room. Try a different code.');
     } finally {
@@ -329,6 +375,133 @@ export const P2PModal: React.FC<P2PModalProps> = ({
                   </p>
                 </div>
 
+                {/* GM Role Option: Pure Narrator vs Play Along as a Witcher */}
+                <div className="space-y-3 p-3.5 bg-[#0e1012] border border-[#2b3137] rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-cinzel text-white uppercase tracking-wider flex items-center gap-1.5 font-bold">
+                      <Crown className="w-3.5 h-3.5 text-[#c99a45]" />
+                      Game Master Role in Session
+                    </label>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#c99a45]/15 text-[#e2ba6d] border border-[#c99a45]/30">
+                      {localGmPlays ? '1 GM + 3 Players' : '4 Player Slots'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Option 1: Pure Narrator */}
+                    <button
+                      type="button"
+                      onClick={() => setLocalGmPlays(false)}
+                      className={`p-2.5 rounded-lg border text-left transition-all flex flex-col justify-between ${
+                        !localGmPlays
+                          ? 'bg-[#1e2329] border-[#c99a45] shadow-md shadow-[#c99a45]/10 ring-1 ring-[#c99a45]'
+                          : 'bg-[#121416] border-[#292f35] text-[#8a929a] hover:border-[#38414b]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 text-xs font-cinzel font-bold text-white mb-1">
+                        <Crown className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Pure Narrator</span>
+                      </div>
+                      <p className="text-[10px] text-[#8a929a] leading-tight">
+                        Spectator & Arbiter only. All 4 Witchers open for joining players.
+                      </p>
+                    </button>
+
+                    {/* Option 2: Play Along */}
+                    <button
+                      type="button"
+                      disabled={isPartyFullForGm}
+                      onClick={() => {
+                        if (!isPartyFullForGm) setLocalGmPlays(true);
+                      }}
+                      className={`p-2.5 rounded-lg border text-left transition-all flex flex-col justify-between ${
+                        isPartyFullForGm
+                          ? 'bg-[#121416] border-[#22252a] text-[#555d65] cursor-not-allowed opacity-60'
+                          : localGmPlays
+                          ? 'bg-[#1e2329] border-[#c99a45] shadow-md shadow-[#c99a45]/10 ring-1 ring-[#c99a45]'
+                          : 'bg-[#121416] border-[#292f35] text-[#8a929a] hover:border-[#38414b]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 text-xs font-cinzel font-bold text-white mb-1">
+                        <Sword className="w-3.5 h-3.5 text-[#c99a45]" />
+                        <span>Play a Witcher</span>
+                      </div>
+                      <p className="text-[10px] text-[#8a929a] leading-tight">
+                        {isPartyFullForGm
+                          ? '4 players in game — selection not permitted.'
+                          : 'Takes 1 slot. Play alongside your party.'}
+                      </p>
+                    </button>
+                  </div>
+
+                  {/* If Playing Along & Party Full */}
+                  {localGmPlays && isPartyFullForGm && (
+                    <div className="p-2.5 rounded bg-amber-950/40 border border-amber-500/40 text-amber-300 text-xs flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>
+                        4 players are already in the session. Character selection is not permitted.
+                      </span>
+                    </div>
+                  )}
+
+                  {/* If Playing Along & Slots Available: Offer Remaining Characters! */}
+                  {localGmPlays && !isPartyFullForGm && (
+                    <div className="pt-2.5 space-y-2 border-t border-[#23282e]">
+                      <div className="text-[11px] font-cinzel text-[#a6b1b9] flex items-center justify-between">
+                        <span className="font-semibold text-white">Choose Your Witcher (Takes 1 Slot):</span>
+                        <span className="text-[10px] text-[#717b85]">Only remaining characters open</span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {PREGEN_WITCHERS.map((char) => {
+                          const assignment = characterAssignments[char.id];
+                          const isClaimedByPlayer = Boolean(
+                            assignment &&
+                              assignment.isLocked &&
+                              assignment.claimedByPeerId !== 'gm'
+                          );
+                          const isSelectedByGm = localGmCharId === char.id;
+
+                          return (
+                            <button
+                              key={char.id}
+                              type="button"
+                              disabled={isClaimedByPlayer}
+                              onClick={() => setLocalGmCharId(char.id)}
+                              className={`p-2 rounded-lg border text-left flex flex-col items-center gap-1.5 transition-all relative ${
+                                isClaimedByPlayer
+                                  ? 'bg-[#101214] border-[#202428] text-[#555d65] cursor-not-allowed opacity-50'
+                                  : isSelectedByGm
+                                  ? 'bg-[#1f242a] border-[#c99a45] ring-2 ring-[#c99a45]/60 text-white shadow-md'
+                                  : 'bg-[#141619] border-[#2b3137] text-[#8a929a] hover:border-[#c99a45]'
+                              }`}
+                            >
+                              <div className="w-10 h-10 rounded-full overflow-hidden border border-[#c99a45]/40 relative">
+                                <img
+                                  src={char.avatarUrl}
+                                  alt={char.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                              <div className="text-center w-full">
+                                <div className="text-[11px] font-cinzel font-bold text-white truncate">
+                                  {char.school}
+                                </div>
+                                <div className="text-[9px] text-[#717b85] truncate">
+                                  {isClaimedByPlayer
+                                    ? `Taken`
+                                    : isSelectedByGm
+                                    ? '✓ Selected'
+                                    : 'Available'}
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <button
                   type="submit"
                   disabled={isLoading}
@@ -454,6 +627,54 @@ export const P2PModal: React.FC<P2PModalProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Active GM Role Indicator & Switch */}
+              {isHost && (
+                <div className="p-3 bg-[#0d0e10] border border-[#2a2f35] rounded-lg flex items-center justify-between">
+                  <div>
+                    <div className="text-[10px] text-[#717b85] uppercase font-cinzel">Current Game Master Role</div>
+                    <div className="text-xs font-semibold text-white flex items-center gap-1.5 mt-0.5">
+                      {gmPlaysWitcher ? (
+                        <>
+                          <Sword className="w-3.5 h-3.5 text-[#c99a45]" />
+                          <span>Playing as Witcher (Takes 1 Slot)</span>
+                        </>
+                      ) : (
+                        <>
+                          <Crown className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Pure Narrator (4 Slots for Players)</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={!gmPlaysWitcher && isPartyFullForGm}
+                    onClick={() => {
+                      if (gmPlaysWitcher) {
+                        onToggleGmPlaysWitcher(false);
+                      } else if (!isPartyFullForGm) {
+                        onToggleGmPlaysWitcher(true, localGmCharId);
+                      }
+                    }}
+                    className={`px-2.5 py-1.5 rounded text-xs font-cinzel transition-all border ${
+                      !gmPlaysWitcher && isPartyFullForGm
+                        ? 'bg-[#15171a] border-[#292e34] text-[#555d65] cursor-not-allowed'
+                        : 'bg-[#1e2329] hover:bg-[#282f37] border-[#38404a] text-[#c99a45] hover:text-[#e2ba6d]'
+                    }`}
+                    title={
+                      !gmPlaysWitcher && isPartyFullForGm
+                        ? '4 players in game. Character selection not permitted.'
+                        : gmPlaysWitcher
+                        ? 'Switch to Narrator Mode (Frees your Witcher slot)'
+                        : 'Take 1 slot and play a Witcher'
+                    }
+                  >
+                    {gmPlaysWitcher ? 'Switch to Narrator' : isPartyFullForGm ? 'Party Full (4/4)' : 'Play a Witcher'}
+                  </button>
+                </div>
+              )}
 
               {/* Host-Only Lobby Security & Player Roster */}
               {isHost && (

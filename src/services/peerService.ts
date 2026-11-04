@@ -54,6 +54,7 @@ export class P2PManager {
   public isConnected: boolean = false;
   public isRoomLocked: boolean = false;
   public hasPinProtection: boolean = false;
+  public hostPlaysWitcher: boolean = true;
 
   private onPacketCallback: ((packet: P2PPacket) => void) | null = null;
   private onPeerCountCallback: ((count: number) => void) | null = null;
@@ -126,12 +127,26 @@ export class P2PManager {
     }
   }
 
+  public setHostPlaysWitcher(plays: boolean) {
+    this.hostPlaysWitcher = plays;
+    if (this.isHost && this.isConnected) {
+      const maxExt = plays ? MAX_PLAYERS - 1 : MAX_PLAYERS;
+      this.onStatusChangeCallback?.(
+        plays
+          ? `Hosting: ${this.currentRoomCode} (GM Playing + ${this.authenticatedPeers.size}/${maxExt} Witchers)`
+          : `Hosting: ${this.currentRoomCode} (GM Narrator Mode: ${this.authenticatedPeers.size}/${maxExt} Witchers)`
+      );
+    }
+  }
+
   public getRoomInfo() {
+    const maxExt = this.hostPlaysWitcher ? MAX_PLAYERS - 1 : MAX_PLAYERS;
     return {
       roomCode: this.currentRoomCode,
       hasPin: this.hasPinProtection,
       isLocked: this.isRoomLocked,
-      maxPlayers: MAX_PLAYERS,
+      hostPlaysWitcher: this.hostPlaysWitcher,
+      maxPlayers: maxExt,
     };
   }
 
@@ -251,12 +266,15 @@ export class P2PManager {
         return;
       }
 
-      // 2. Check 4-Witcher Party Capacity
-      if (this.authenticatedPeers.size >= MAX_PLAYERS) {
+      // 2. Check 4-Witcher Party Capacity (Adjusts based on whether GM takes a player slot)
+      const maxExt = this.hostPlaysWitcher ? MAX_PLAYERS - 1 : MAX_PLAYERS;
+      if (this.authenticatedPeers.size >= maxExt) {
         const rejectFrame: HandshakeFrame = {
           _witcherHandshake: true,
           step: 'AUTH_REJECT',
-          reason: `Witcher party is full (${MAX_PLAYERS}/${MAX_PLAYERS} players connected).`,
+          reason: `Witcher party is full (${this.authenticatedPeers.size}/${maxExt} player slots filled${
+            this.hostPlaysWitcher ? ' with GM' : ''
+          }).`,
           ts: Date.now(),
         };
         conn.send(rejectFrame);
