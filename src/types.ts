@@ -193,6 +193,14 @@ export interface ChatMessage {
   timestamp: number;
 }
 
+export interface CharacterAssignment {
+  characterId: string;
+  claimedByPeerId: string;
+  claimedByName: string;
+  isLocked: boolean;
+  claimedAt: number;
+}
+
 export interface P2PPacket {
   type: 
     | 'SYNC_STATE'
@@ -205,7 +213,9 @@ export interface P2PPacket {
     | 'TOKEN_REMOVE'
     | 'MAP_CHANGE'
     | 'CHARACTER_UPDATE'
-    | 'PING_COORDINATE';
+    | 'PING_COORDINATE'
+    | 'CHARACTER_CLAIM'
+    | 'CHARACTER_ASSIGNMENT_SYNC';
   senderId: string;
   senderName: string;
   payload: any;

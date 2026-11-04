@@ -21,7 +21,8 @@ import {
   ChatMessage, 
   P2PPacket, 
   Monster,
-  SpeechRoleplayMode 
+  SpeechRoleplayMode,
+  CharacterAssignment,
 } from './types';
 import { PREGEN_WITCHERS } from './data/characters';
 import { MAP_SCENES } from './data/maps';
@@ -170,11 +171,41 @@ export const App: React.FC = () => {
     ];
   });
 
+  // Character assignments & locking (Only 1 of each Witcher, only DM can reassign)
+  const [characterAssignments, setCharacterAssignments] = useState<Record<string, CharacterAssignment>>(() => {
+    if (initialSave?.characterAssignments) {
+      return initialSave.characterAssignments;
+    }
+    return {
+      'char-wolf': {
+        characterId: 'char-wolf',
+        claimedByPeerId: 'gm',
+        claimedByName: 'Game Master',
+        isLocked: true,
+        claimedAt: Date.now(),
+      },
+    };
+  });
+
   // Ref to hold live state for asynchronous P2P packet handling
-  const gameStateRef = useRef({ currentScene, tokens, messages, selectedCharacter, isHost });
+  const gameStateRef = useRef({
+    currentScene,
+    tokens,
+    messages,
+    selectedCharacter,
+    characterAssignments,
+    isHost,
+  });
   useEffect(() => {
-    gameStateRef.current = { currentScene, tokens, messages, selectedCharacter, isHost };
-  }, [currentScene, tokens, messages, selectedCharacter, isHost]);
+    gameStateRef.current = {
+      currentScene,
+      tokens,
+      messages,
+      selectedCharacter,
+      characterAssignments,
+      isHost,
+    };
+  }, [currentScene, tokens, messages, selectedCharacter, characterAssignments, isHost]);
 
   // Auto-save to Game Master's browser local storage
   useEffect(() => {
@@ -183,8 +214,9 @@ export const App: React.FC = () => {
       tokens,
       messages,
       selectedCharacterId: selectedCharacter.id,
+      characterAssignments,
     });
-  }, [currentScene, tokens, messages, selectedCharacter]);
+  }, [currentScene, tokens, messages, selectedCharacter, characterAssignments]);
 
   // Handle incoming P2P Packet
   const handleP2PPacket = useCallback((packet: P2PPacket) => {
@@ -248,6 +280,7 @@ export const App: React.FC = () => {
               tokens: gameStateRef.current.tokens,
               messages: gameStateRef.current.messages,
               selectedCharacterId: gameStateRef.current.selectedCharacter.id,
+              characterAssignments: gameStateRef.current.characterAssignments,
             },
             timestamp: Date.now(),
           });
@@ -265,7 +298,121 @@ export const App: React.FC = () => {
         if (packet.payload.messages && Array.isArray(packet.payload.messages)) {
           setMessages(packet.payload.messages);
         }
+        if (packet.payload.characterAssignments) {
+          const assignments = packet.payload.characterAssignments as Record<string, CharacterAssignment>;
+          setCharacterAssignments(assignments);
+
+          // Check if newly joined player already has an assigned locked character
+          const myAssignment = Object.values(assignments).find(
+            (a) => a.claimedByPeerId === p2pManager.myPeerId
+          );
+          if (myAssignment) {
+            const found = PREGEN_WITCHERS.find((w) => w.id === myAssignment.characterId);
+            if (found) setSelectedCharacter(found);
+          } else {
+            // Guided player onboarding: Open character select & locking modal!
+            setIsCharSelectOpen(true);
+          }
+        } else {
+          setIsCharSelectOpen(true);
+        }
         break;
+
+      case 'CHARACTER_CLAIM': {
+        if (gameStateRef.current.isHost) {
+          const { characterId, playerName } = packet.payload;
+          const existing = gameStateRef.current.characterAssignments[characterId];
+          const targetWitcher = PREGEN_WITCHERS.find((w) => w.id === characterId);
+
+          if (existing && existing.isLocked && existing.claimedByPeerId !== packet.senderId) {
+            // Already claimed by someone else
+            p2pManager.send({
+              type: 'CHAT_MESSAGE',
+              senderId: 'system',
+              senderName: 'Chronicle of Cintra',
+              payload: {
+                id: `claim-denied-${Date.now()}`,
+                senderId: 'system',
+                senderName: 'System',
+                type: 'system',
+                text: `School of the ${targetWitcher?.school || 'Witcher'} is already claimed by ${existing.claimedByName}! Please select an available School.`,
+                timestamp: Date.now(),
+              },
+              timestamp: Date.now(),
+            });
+            return;
+          }
+
+          // Approve and update assignment
+          const updated: Record<string, CharacterAssignment> = {
+            ...gameStateRef.current.characterAssignments,
+            [characterId]: {
+              characterId,
+              claimedByPeerId: packet.senderId,
+              claimedByName: playerName || packet.senderName,
+              isLocked: true,
+              claimedAt: Date.now(),
+            },
+          };
+
+          setCharacterAssignments(updated);
+
+          // Broadcast authoritative assignments to all connected players
+          p2pManager.send({
+            type: 'CHARACTER_ASSIGNMENT_SYNC',
+            senderId: 'gm',
+            senderName: 'Game Master',
+            payload: updated,
+            timestamp: Date.now(),
+          });
+
+          // Announce in chat log
+          const claimNotice = `⚔️ ${playerName || packet.senderName} has locked in ${targetWitcher?.name} (School of the ${targetWitcher?.school})!`;
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `claim-${Date.now()}`,
+              senderId: 'system',
+              senderName: 'Chronicle of Cintra',
+              type: 'system',
+              text: claimNotice,
+              timestamp: Date.now(),
+            },
+          ]);
+        }
+        break;
+      }
+
+      case 'CHARACTER_ASSIGNMENT_SYNC': {
+        const assignments = packet.payload as Record<string, CharacterAssignment>;
+        setCharacterAssignments(assignments);
+
+        // If I was assigned a character, update my selected Witcher
+        const myAssignment = Object.values(assignments).find(
+          (a) =>
+            a.claimedByPeerId === p2pManager.myPeerId ||
+            (!gameStateRef.current.isHost && a.claimedByName === gameStateRef.current.selectedCharacter.name)
+        );
+        if (myAssignment) {
+          const found = PREGEN_WITCHERS.find((w) => w.id === myAssignment.characterId);
+          if (found && found.id !== gameStateRef.current.selectedCharacter.id) {
+            setSelectedCharacter(found);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: `reassigned-${Date.now()}`,
+                senderId: 'system',
+                senderName: 'Game Master',
+                isDM: true,
+                type: 'system',
+                text: `Game Master has assigned you to play ${found.name} (School of the ${found.school}).`,
+                timestamp: Date.now(),
+              },
+            ]);
+          }
+        }
+        break;
+      }
 
       case 'SYNC_STATE':
         if (packet.payload.tokens) setTokens(packet.payload.tokens);
@@ -548,6 +695,102 @@ export const App: React.FC = () => {
     handleAddLogMessage(`${char.name} (School of the ${char.school}) readies their silver and steel.`, 'system');
   };
 
+  // Claim / Lock Character (Enforces 1 of each Witcher; only DM can reassign)
+  const handleClaimCharacter = (char: WitcherCharacter) => {
+    if (isHost) {
+      const updated: Record<string, CharacterAssignment> = {
+        ...characterAssignments,
+        [char.id]: {
+          characterId: char.id,
+          claimedByPeerId: 'gm',
+          claimedByName: 'Game Master',
+          isLocked: true,
+          claimedAt: Date.now(),
+        },
+      };
+      setCharacterAssignments(updated);
+      p2pManager.send({
+        type: 'CHARACTER_ASSIGNMENT_SYNC',
+        senderId: 'gm',
+        senderName: 'Game Master',
+        payload: updated,
+        timestamp: Date.now(),
+      });
+      handleAddLogMessage(`Game Master locked in as ${char.name} (School of the ${char.school}).`, 'system');
+    } else {
+      p2pManager.send({
+        type: 'CHARACTER_CLAIM',
+        senderId: p2pManager.myPeerId,
+        senderName: char.name,
+        payload: { characterId: char.id, playerName: char.name },
+        timestamp: Date.now(),
+      });
+      setCharacterAssignments((prev) => ({
+        ...prev,
+        [char.id]: {
+          characterId: char.id,
+          claimedByPeerId: p2pManager.myPeerId,
+          claimedByName: char.name,
+          isLocked: true,
+          claimedAt: Date.now(),
+        },
+      }));
+      handleAddLogMessage(`Claimed and locked into ${char.name} (School of the ${char.school}).`, 'system');
+    }
+  };
+
+  // Reassign Character (Game Master Only)
+  const handleReassignCharacter = (
+    characterId: string,
+    targetPeerId: string,
+    targetPlayerName: string
+  ) => {
+    if (!isHost) return;
+    const targetWitcher = PREGEN_WITCHERS.find((w) => w.id === characterId);
+    const updated: Record<string, CharacterAssignment> = {
+      ...characterAssignments,
+      [characterId]: {
+        characterId,
+        claimedByPeerId: targetPeerId,
+        claimedByName: targetPlayerName,
+        isLocked: true,
+        claimedAt: Date.now(),
+      },
+    };
+    setCharacterAssignments(updated);
+    p2pManager.send({
+      type: 'CHARACTER_ASSIGNMENT_SYNC',
+      senderId: 'gm',
+      senderName: 'Game Master',
+      payload: updated,
+      timestamp: Date.now(),
+    });
+    handleAddLogMessage(
+      `Game Master reassigned ${targetWitcher?.name} (School of the ${targetWitcher?.school}) to ${targetPlayerName}.`,
+      'system'
+    );
+  };
+
+  // Unlock / Free Character (Game Master Only)
+  const handleUnlockCharacter = (characterId: string) => {
+    if (!isHost) return;
+    const targetWitcher = PREGEN_WITCHERS.find((w) => w.id === characterId);
+    const updated = { ...characterAssignments };
+    delete updated[characterId];
+    setCharacterAssignments(updated);
+    p2pManager.send({
+      type: 'CHARACTER_ASSIGNMENT_SYNC',
+      senderId: 'gm',
+      senderName: 'Game Master',
+      payload: updated,
+      timestamp: Date.now(),
+    });
+    handleAddLogMessage(
+      `Game Master unlocked ${targetWitcher?.name || 'Witcher'} — now available for players to claim!`,
+      'system'
+    );
+  };
+
   // Spawn monster from Bestiary modal
   const handleSpawnFromBestiary = (monster: Monster) => {
     const newToken: MapToken = {
@@ -577,6 +820,9 @@ export const App: React.FC = () => {
       const ch = PREGEN_WITCHERS.find((w) => w.id === saved.selectedCharacterId);
       if (ch) setSelectedCharacter(ch);
     }
+    if (saved.characterAssignments) {
+      setCharacterAssignments(saved.characterAssignments);
+    }
 
     if (isHost) {
       p2pManager.send({
@@ -588,6 +834,7 @@ export const App: React.FC = () => {
           tokens: saved.tokens,
           messages: saved.messages,
           selectedCharacterId: saved.selectedCharacterId,
+          characterAssignments: saved.characterAssignments || characterAssignments,
         },
         timestamp: Date.now(),
       });
@@ -606,6 +853,7 @@ export const App: React.FC = () => {
         tokens,
         messages,
         selectedCharacterId: selectedCharacter.id,
+        characterAssignments,
       },
       timestamp: Date.now(),
     });
@@ -639,6 +887,17 @@ export const App: React.FC = () => {
     ]);
   };
 
+  // Check if active character is locked to this seat
+  const isCurrentCharacterLocked = Boolean(
+    Object.values(characterAssignments).find(
+      (a) =>
+        a.isLocked &&
+        (a.claimedByPeerId === p2pManager.myPeerId ||
+          (isHost && a.claimedByPeerId === 'gm') ||
+          a.claimedByName === selectedCharacter.name)
+    )
+  );
+
   return (
     <div className="min-h-screen bg-[#0c0d0e] text-[#d6d9dc] flex flex-col">
       
@@ -650,6 +909,7 @@ export const App: React.FC = () => {
         isHost={isHost}
         peerCount={peerCount}
         statusText={statusText}
+        isCharacterLocked={isCurrentCharacterLocked}
         onOpenP2PModal={() => setIsP2PModalOpen(true)}
         onOpenGuideModal={() => setIsGuideModalOpen(true)}
         onOpenBestiaryModal={() => setIsBestiaryModalOpen(true)}
@@ -668,9 +928,9 @@ export const App: React.FC = () => {
         
         {/* VIEW 1: TACTICAL MAP & CHAT */}
         {activeTab === 'map' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 h-[calc(100vh-120px)] min-h-[620px]">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 h-[calc(100vh-120px)] min-h-[620px] min-w-0">
             {/* Tactical Map Area (2/3 width) */}
-            <div className="lg:col-span-2 h-full flex flex-col">
+            <div className="lg:col-span-2 h-full flex flex-col min-w-0 overflow-hidden">
               <TacticalMap
                 currentScene={currentScene}
                 onSceneChange={handleSceneChange}
@@ -686,7 +946,7 @@ export const App: React.FC = () => {
             </div>
 
             {/* Chat & Combat Log Area (1/3 width) */}
-            <div className="h-full flex flex-col">
+            <div className="h-full flex flex-col min-w-0 overflow-hidden">
               <ChatCombatLog
                 messages={messages}
                 onSendMessage={handleSendMessage}
@@ -742,12 +1002,20 @@ export const App: React.FC = () => {
         onRoll={handleRollDice}
       />
 
-      {/* Character Select Modal */}
+      {/* Character Select & Locking Modal */}
       <CharacterSelect
         isOpen={isCharSelectOpen}
         onClose={() => setIsCharSelectOpen(false)}
         selectedCharacter={selectedCharacter}
         onSelectCharacter={handleSelectCharacter}
+        characterAssignments={characterAssignments}
+        onClaimCharacter={handleClaimCharacter}
+        isHost={isHost}
+        myPeerId={p2pManager.myPeerId}
+        myPlayerName={selectedCharacter.name}
+        connectedPeers={connectedPeers}
+        onReassignCharacter={handleReassignCharacter}
+        onUnlockCharacter={handleUnlockCharacter}
       />
 
       {/* P2P Multiplayer Modal */}

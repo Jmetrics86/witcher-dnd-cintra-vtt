@@ -1,4 +1,4 @@
-import { MapToken, ChatMessage } from '../types';
+import { MapToken, ChatMessage, CharacterAssignment } from '../types';
 
 export interface CampaignSaveState {
   version: number;
@@ -8,6 +8,7 @@ export interface CampaignSaveState {
   tokens: MapToken[];
   messages: ChatMessage[];
   selectedCharacterId: string;
+  characterAssignments?: Record<string, CharacterAssignment>;
 }
 
 const STORAGE_KEY = 'witcher_cintra_campaign_v1';

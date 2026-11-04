@@ -26,6 +26,7 @@ const HOST_ONLY_PACKET_TYPES = new Set<P2PPacket['type']>([
   'MAP_CHANGE',
   'TOKEN_ADD',
   'TOKEN_REMOVE',
+  'CHARACTER_ASSIGNMENT_SYNC',
 ]);
 
 const VALID_PACKET_TYPES = new Set<P2PPacket['type']>([
@@ -40,6 +41,8 @@ const VALID_PACKET_TYPES = new Set<P2PPacket['type']>([
   'MAP_CHANGE',
   'CHARACTER_UPDATE',
   'PING_COORDINATE',
+  'CHARACTER_CLAIM',
+  'CHARACTER_ASSIGNMENT_SYNC',
 ]);
 
 // Convert ArrayBuffer / Uint8Array to Base64
@@ -378,6 +381,24 @@ export function validateAndSanitizePacket(
           senderId,
           senderName,
           payload: { message },
+          timestamp,
+        },
+      };
+    }
+
+    case 'CHARACTER_CLAIM': {
+      if (!payload || typeof payload !== 'object') {
+        return { valid: false, reason: 'Invalid CHARACTER_CLAIM payload' };
+      }
+      const characterId = sanitizeString(payload.characterId, 80);
+      const playerName = sanitizeString(payload.playerName, 60);
+      return {
+        valid: true,
+        packet: {
+          type,
+          senderId,
+          senderName,
+          payload: { characterId, playerName },
           timestamp,
         },
       };

@@ -40,6 +40,7 @@ export const DiceRollerTray: React.FC<DiceRollerTrayProps> = ({
           </h4>
         </div>
         <button
+          type="button"
           onClick={onClose}
           className="p-1 rounded text-[#8a929a] hover:text-white hover:bg-[#252b31] transition-colors"
         >
@@ -50,6 +51,7 @@ export const DiceRollerTray: React.FC<DiceRollerTrayProps> = ({
       {/* Advantage / Disadvantage Mode */}
       <div className="grid grid-cols-3 gap-1 bg-[#0f1113] p-1 rounded-lg border border-[#262b31] mb-3 text-[11px] font-cinzel">
         <button
+          type="button"
           onClick={() => setRollMode('normal')}
           className={`py-1 rounded transition-colors ${
             rollMode === 'normal' ? 'bg-[#293037] text-white font-bold' : 'text-[#8a929a] hover:text-white'
@@ -58,6 +60,7 @@ export const DiceRollerTray: React.FC<DiceRollerTrayProps> = ({
           Normal
         </button>
         <button
+          type="button"
           onClick={() => setRollMode('advantage')}
           className={`py-1 rounded transition-colors ${
             rollMode === 'advantage' ? 'bg-emerald-900/60 border border-emerald-500/50 text-emerald-300 font-bold' : 'text-[#8a929a] hover:text-white'
@@ -66,6 +69,7 @@ export const DiceRollerTray: React.FC<DiceRollerTrayProps> = ({
           Advantage
         </button>
         <button
+          type="button"
           onClick={() => setRollMode('disadvantage')}
           className={`py-1 rounded transition-colors ${
             rollMode === 'disadvantage' ? 'bg-rose-900/60 border border-rose-500/50 text-rose-300 font-bold' : 'text-[#8a929a] hover:text-white'
@@ -76,7 +80,7 @@ export const DiceRollerTray: React.FC<DiceRollerTrayProps> = ({
       </div>
 
       {/* Standard Dice Buttons */}
-      <div className="grid grid-cols-4 gap-2 mb-3">
+      <div className="grid grid-cols-4 gap-2 mb-3 select-none">
         {[
           { label: 'd20', sides: 20, color: 'text-amber-400 border-amber-500/30' },
           { label: 'd12', sides: 12, color: 'text-red-400 border-red-500/30' },
@@ -89,6 +93,7 @@ export const DiceRollerTray: React.FC<DiceRollerTrayProps> = ({
         ].map((dice) => (
           <button
             key={dice.label}
+            type="button"
             onClick={() => {
               if (dice.customFormula) {
                 handlePresetRoll(`Rolled ${dice.customFormula}`, dice.customFormula, modifier);
@@ -108,6 +113,7 @@ export const DiceRollerTray: React.FC<DiceRollerTrayProps> = ({
         <span className="font-cinzel text-[#8a929a]">Modifier:</span>
         <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={() => setModifier((m) => m - 1)}
             className="p-1 rounded bg-[#20252b] hover:bg-[#2d343c] text-white"
           >
@@ -117,6 +123,7 @@ export const DiceRollerTray: React.FC<DiceRollerTrayProps> = ({
             {modifier >= 0 ? `+${modifier}` : modifier}
           </span>
           <button
+            type="button"
             onClick={() => setModifier((m) => m + 1)}
             className="p-1 rounded bg-[#20252b] hover:bg-[#2d343c] text-white"
           >
@@ -132,12 +139,14 @@ export const DiceRollerTray: React.FC<DiceRollerTrayProps> = ({
         </div>
         <div className="grid grid-cols-2 gap-1.5 text-[11px]">
           <button
+            type="button"
             onClick={() => handlePresetRoll('Initiative Roll', '1d20', 4)}
             className="py-1.5 px-2 rounded bg-[#1e2227] hover:bg-[#282f36] text-[#a6b1b9] hover:text-white border border-[#2f363e] font-cinzel text-left truncate"
           >
             ⚡ Initiative (+4)
           </button>
           <button
+            type="button"
             onClick={() => handlePresetRoll('Witcher Senses Check', '1d20', 8)}
             className="py-1.5 px-2 rounded bg-[#1e2227] hover:bg-[#282f36] text-[#a6b1b9] hover:text-white border border-[#2f363e] font-cinzel text-left truncate"
           >

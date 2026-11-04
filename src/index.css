@@ -3,11 +3,19 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    scrollbar-gutter: stable;
+  }
+
   body {
     background-color: #0c0d0e;
     color: #d6d9dc;
     font-family: 'Inter', sans-serif;
     overflow-x: hidden;
+  }
+
+  button, input, select, textarea {
+    touch-action: manipulation;
   }
 
   h1, h2, h3, h4, .font-cinzel {

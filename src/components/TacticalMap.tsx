@@ -167,14 +167,15 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
       </div>
 
       {/* Main Interactive Map Canvas */}
-      <div className="relative flex-1 bg-[#0a0b0c] overflow-hidden select-none min-h-[460px]">
+      <div className="relative flex-1 bg-[#0a0b0c] overflow-hidden select-none min-h-[460px] min-w-0">
         <div
           ref={mapRef}
           onClick={handleMapClick}
           className="relative w-full h-full cursor-crosshair overflow-hidden"
           style={{
             backgroundImage: `url(${currentScene.imageUrl})`,
-            backgroundSize: 'cover',
+            backgroundSize: '100% 100%',
+            backgroundRepeat: 'no-repeat',
             backgroundPosition: 'center',
           }}
         >
