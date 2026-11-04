@@ -24,6 +24,8 @@ interface NavbarProps {
   isHost: boolean;
   gmPlaysWitcher?: boolean;
   peerCount: number;
+  totalPlayersInRoom?: number;
+  observersCount?: number;
   statusText: string;
   isCharacterLocked?: boolean;
   onOpenP2PModal: () => void;
@@ -46,6 +48,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   isHost,
   gmPlaysWitcher,
   peerCount,
+  totalPlayersInRoom,
+  observersCount,
   statusText,
   isCharacterLocked,
   onOpenP2PModal,
@@ -176,7 +180,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             </span>
             {isConnected && (
               <span className="bg-emerald-500/20 text-emerald-300 text-[10px] px-1.5 py-0.2 rounded-full border border-emerald-500/30">
-                {peerCount + (isHost ? 1 : 0)}p
+                {totalPlayersInRoom !== undefined
+                  ? `${totalPlayersInRoom}p${observersCount ? ` + ${observersCount}obs` : ''}`
+                  : `${peerCount + (isHost ? 1 : 0)}p`}
               </span>
             )}
           </button>

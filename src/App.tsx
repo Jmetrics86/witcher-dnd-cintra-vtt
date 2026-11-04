@@ -119,6 +119,7 @@ export const App: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [isHost, setIsHost] = useState(false);
   const [gmPlaysWitcher, setGmPlaysWitcher] = useState<boolean>(true);
+  const [isObserver, setIsObserver] = useState<boolean>(false);
   const [peerCount, setPeerCount] = useState(0);
   const [connectedPeers, setConnectedPeers] = useState<ConnectedPeerInfo[]>([]);
   const [isRoomLocked, setIsRoomLocked] = useState(false);
@@ -282,6 +283,8 @@ export const App: React.FC = () => {
               messages: gameStateRef.current.messages,
               selectedCharacterId: gameStateRef.current.selectedCharacter.id,
               characterAssignments: gameStateRef.current.characterAssignments,
+              gmPlaysWitcher: p2pManager.hostPlaysWitcher,
+              connectedPeers: p2pManager.getConnectedPeers(),
             },
             timestamp: Date.now(),
           });
@@ -299,6 +302,13 @@ export const App: React.FC = () => {
         if (packet.payload.messages && Array.isArray(packet.payload.messages)) {
           setMessages(packet.payload.messages);
         }
+        if (packet.payload.gmPlaysWitcher !== undefined) {
+          setGmPlaysWitcher(packet.payload.gmPlaysWitcher);
+        }
+        if (packet.payload.connectedPeers && Array.isArray(packet.payload.connectedPeers)) {
+          setConnectedPeers(packet.payload.connectedPeers);
+        }
+        setIsObserver(p2pManager.isObserver);
         if (packet.payload.characterAssignments) {
           const assignments = packet.payload.characterAssignments as Record<string, CharacterAssignment>;
           setCharacterAssignments(assignments);
@@ -310,11 +320,16 @@ export const App: React.FC = () => {
           if (myAssignment) {
             const found = PREGEN_WITCHERS.find((w) => w.id === myAssignment.characterId);
             if (found) setSelectedCharacter(found);
+          } else if (p2pManager.isObserver) {
+            handleAddLogMessage(
+              'Party is full (4 Players active). You are connected as an Observer (Spectating).',
+              'system'
+            );
           } else {
             // Guided player onboarding: Open character select & locking modal!
             setIsCharSelectOpen(true);
           }
-        } else {
+        } else if (!p2pManager.isObserver) {
           setIsCharSelectOpen(true);
         }
         break;
@@ -558,6 +573,7 @@ export const App: React.FC = () => {
     await p2pManager.joinRoom(roomCode, name, pin, selectedCharacter.school);
     setIsHost(false);
     setIsConnected(true);
+    setIsObserver(p2pManager.isObserver);
   };
 
   // Disconnect
@@ -565,6 +581,7 @@ export const App: React.FC = () => {
     p2pManager.disconnect();
     setIsHost(false);
     setIsConnected(false);
+    setIsObserver(false);
     setPeerCount(0);
     setConnectedPeers([]);
     setIsRoomLocked(false);
@@ -1009,6 +1026,17 @@ export const App: React.FC = () => {
     )
   );
 
+  // Player count calculation (No denominator! Counts active Witcher players)
+  const gmPlayerCount = gmPlaysWitcher ? 1 : 0;
+  const peerPlayersCount = connectedPeers.filter((p) => !p.isObserver).length;
+  const lockedCharCount = Object.values(characterAssignments).filter((a) => a.isLocked).length;
+
+  const totalPlayersInRoom = isConnected
+    ? Math.max(gmPlayerCount + peerPlayersCount, lockedCharCount || (gmPlaysWitcher ? 1 : 0))
+    : 0;
+
+  const observersCount = connectedPeers.filter((p) => p.isObserver).length;
+
   return (
     <div className="min-h-screen bg-[#0c0d0e] text-[#d6d9dc] flex flex-col">
       
@@ -1020,6 +1048,8 @@ export const App: React.FC = () => {
         isHost={isHost}
         gmPlaysWitcher={gmPlaysWitcher}
         peerCount={peerCount}
+        totalPlayersInRoom={totalPlayersInRoom}
+        observersCount={observersCount}
         statusText={statusText}
         isCharacterLocked={isCurrentCharacterLocked}
         onOpenP2PModal={() => setIsP2PModalOpen(true)}
@@ -1128,6 +1158,7 @@ export const App: React.FC = () => {
         connectedPeers={connectedPeers}
         onReassignCharacter={handleReassignCharacter}
         onUnlockCharacter={handleUnlockCharacter}
+        isObserver={isObserver}
       />
 
       {/* P2P Multiplayer Modal */}

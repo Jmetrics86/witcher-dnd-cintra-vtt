@@ -17,6 +17,7 @@ export interface HandshakeFrame {
   playerName?: string;
   school?: string;
   reason?: string;
+  isObserver?: boolean;
   ts: number;
 }
 

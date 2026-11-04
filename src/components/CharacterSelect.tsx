@@ -11,6 +11,7 @@ import {
   Crown,
   UserCheck,
   AlertCircle,
+  Eye,
 } from 'lucide-react';
 import { WitcherCharacter, WitcherSchool, CharacterAssignment } from '../types';
 import { PREGEN_WITCHERS } from '../data/characters';
@@ -33,6 +34,7 @@ interface CharacterSelectProps {
     targetPlayerName: string
   ) => void;
   onUnlockCharacter?: (characterId: string) => void;
+  isObserver?: boolean;
 }
 
 export const CharacterSelect: React.FC<CharacterSelectProps> = ({
@@ -48,6 +50,7 @@ export const CharacterSelect: React.FC<CharacterSelectProps> = ({
   connectedPeers = [],
   onReassignCharacter,
   onUnlockCharacter,
+  isObserver = false,
 }) => {
   const [reassignTarget, setReassignTarget] = useState<Record<string, string>>({});
 
@@ -118,6 +121,8 @@ export const CharacterSelect: React.FC<CharacterSelectProps> = ({
             <span>
               {isHost
                 ? 'As Game Master, you have master authority to assign, reassign, or unlock any character for your players.'
+                : isObserver
+                ? 'Observer Mode: All 4 Witcher player slots are filled (1 Narrator + 4 Players max). You are spectating the chronicle in real time.'
                 : isMyCharacterLocked
                 ? `You are locked into your chosen character. To change schools, request a reassignment from your Game Master.`
                 : 'Select an available Witcher and click "Lock In Character" to join your party.'}
@@ -262,6 +267,11 @@ export const CharacterSelect: React.FC<CharacterSelectProps> = ({
                         <div className="w-full py-2 px-3 rounded-lg text-xs font-cinzel text-[#717b85] bg-[#121416] border border-[#282d33] flex items-center justify-center gap-1.5 cursor-not-allowed">
                           <Lock className="w-3.5 h-3.5 text-amber-500/70" />
                           <span className="truncate">Claimed by {assignment?.claimedByName}</span>
+                        </div>
+                      ) : isObserver ? (
+                        <div className="w-full py-2 px-3 rounded-lg text-xs font-cinzel text-blue-300 bg-blue-950/30 border border-blue-500/30 flex items-center justify-center gap-1.5 cursor-not-allowed">
+                          <Eye className="w-3.5 h-3.5 text-blue-400" />
+                          <span>Spectating (Observer)</span>
                         </div>
                       ) : (
                         <button

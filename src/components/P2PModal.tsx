@@ -59,7 +59,7 @@ export const P2PModal: React.FC<P2PModalProps> = ({
   onClose,
   isHost,
   isConnected,
-  peerCount,
+  peerCount: _peerCount,
   connectedPeers,
   statusText,
   onConnectHost,
@@ -105,12 +105,17 @@ export const P2PModal: React.FC<P2PModalProps> = ({
     }
   }, [selectedCharacterId]);
 
-  // Check if 4 players are already in the session
-  const externalPlayersCount = isConnected ? peerCount : connectedPeers.length;
-  const claimedByOthersCount = Object.values(characterAssignments).filter(
-    (a) => a.isLocked && a.claimedByPeerId !== 'gm'
-  ).length;
-  const isPartyFullForGm = externalPlayersCount >= 4 || claimedByOthersCount >= 4;
+  // Player count calculation (No denominator! Counts active Witcher players)
+  const gmPlayerCount = gmPlaysWitcher ? 1 : 0;
+  const peerPlayersCount = connectedPeers.filter((p) => !p.isObserver).length;
+  const lockedAssignmentsCount = Object.values(characterAssignments).filter((a) => a.isLocked).length;
+
+  const totalPlayersInRoom = isConnected
+    ? Math.max(gmPlayerCount + peerPlayersCount, lockedAssignmentsCount || (gmPlaysWitcher ? 1 : 0))
+    : 0;
+
+  const observersCount = connectedPeers.filter((p) => p.isObserver).length;
+  const isPartyFullForGm = totalPlayersInRoom >= 4;
 
   useEffect(() => {
     if (initialRoomFromUrl) {
@@ -257,8 +262,20 @@ export const P2PModal: React.FC<P2PModalProps> = ({
               {isConnected && (
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/10">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono bg-black/40 px-2.5 py-1 rounded border border-white/10 text-white">
-                      Witcher Party: {isHost ? `${peerCount} / 4 Players` : 'Connected to GM'}
+                    <span className="text-xs font-mono bg-black/40 px-2.5 py-1 rounded border border-white/10 text-white flex items-center gap-2">
+                      <Sword className="w-3.5 h-3.5 text-[#c99a45]" />
+                      <span>
+                        {totalPlayersInRoom} {totalPlayersInRoom === 1 ? 'Player' : 'Players'} in Room
+                        {isHost && !gmPlaysWitcher ? ' (Narrator Host)' : isHost ? ' (GM Playing)' : ''}
+                      </span>
+                      {observersCount > 0 && (
+                        <span className="text-blue-300 border-l border-white/20 pl-2 flex items-center gap-1">
+                          <Eye className="w-3 h-3 text-blue-400" />
+                          <span>
+                            {observersCount} {observersCount === 1 ? 'Observer' : 'Observers'}
+                          </span>
+                        </span>
+                      )}
                     </span>
                     {roomPin && (
                       <span className="text-[11px] font-mono bg-amber-500/15 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30 flex items-center gap-1">
@@ -671,7 +688,7 @@ export const P2PModal: React.FC<P2PModalProps> = ({
                         : 'Take 1 slot and play a Witcher'
                     }
                   >
-                    {gmPlaysWitcher ? 'Switch to Narrator' : isPartyFullForGm ? 'Party Full (4/4)' : 'Play a Witcher'}
+                    {gmPlaysWitcher ? 'Switch to Narrator' : isPartyFullForGm ? 'Party Full (4 Players)' : 'Play a Witcher'}
                   </button>
                 </div>
               )}
@@ -680,9 +697,19 @@ export const P2PModal: React.FC<P2PModalProps> = ({
               {isHost && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-cinzel uppercase tracking-wider text-[#a6b1b9]">
-                      Connected Witchers ({connectedPeers.length} / 4 Max)
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-cinzel uppercase tracking-wider text-[#a6b1b9]">
+                        Party Roster ({totalPlayersInRoom} {totalPlayersInRoom === 1 ? 'Player' : 'Players'})
+                      </span>
+                      {observersCount > 0 && (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/15 text-blue-300 border border-blue-500/30 flex items-center gap-1">
+                          <Eye className="w-3 h-3 text-blue-400" />
+                          <span>
+                            {observersCount} {observersCount === 1 ? 'Observer' : 'Observers'}
+                          </span>
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2">
                       {onForceSyncPeers && (
                         <button
@@ -731,13 +758,26 @@ export const P2PModal: React.FC<P2PModalProps> = ({
                           className="flex items-center justify-between p-2.5 rounded-lg bg-[#0d0e10] border border-[#2a2f35]"
                         >
                           <div className="flex items-center gap-2.5">
-                            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                            <div
+                              className={`w-2 h-2 rounded-full ${
+                                peer.isObserver ? 'bg-blue-400' : 'bg-emerald-400'
+                              } animate-pulse`}
+                            />
                             <div>
                               <div className="text-xs font-semibold text-white flex items-center gap-2">
                                 <span>{peer.playerName}</span>
-                                {peer.school && (
+                                {peer.isObserver ? (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-300 border border-blue-500/30 flex items-center gap-1">
+                                    <Eye className="w-3 h-3 text-blue-400" />
+                                    <span>Observer</span>
+                                  </span>
+                                ) : peer.school ? (
                                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#c99a45]/15 text-[#c99a45] border border-[#c99a45]/30">
                                     School of the {peer.school}
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                                    Player (Selecting)
                                   </span>
                                 )}
                               </div>

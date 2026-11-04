@@ -20,9 +20,11 @@ export interface ConnectedPeerInfo {
   joinedAt: number;
   latencyMs?: number;
   isEncrypted: boolean;
+  isObserver?: boolean;
 }
 
-const MAX_PLAYERS = 4; // Up to 4 Witchers (Wolf, Cat, Griffin, Bear)
+const MAX_PLAYERS = 4; // Max 4 active Witcher players (Wolf, Cat, Griffin, Bear)
+const MAX_ROOM_CAPACITY = 24; // Up to 24 WebRTC connections (1 Narrator + 4 Players + Observers)
 const RATE_LIMIT_WINDOW_MS = 1000;
 const MAX_PACKETS_PER_SEC = 25;
 const MAX_CLIENT_PAYLOAD_BYTES = 65536; // 64 KB max from a client
@@ -55,6 +57,7 @@ export class P2PManager {
   public isRoomLocked: boolean = false;
   public hasPinProtection: boolean = false;
   public hostPlaysWitcher: boolean = true;
+  public isObserver: boolean = false;
 
   private onPacketCallback: ((packet: P2PPacket) => void) | null = null;
   private onPeerCountCallback: ((count: number) => void) | null = null;
@@ -82,10 +85,12 @@ export class P2PManager {
   public setRoomLocked(locked: boolean) {
     this.isRoomLocked = locked;
     if (this.isHost && this.isConnected) {
+      const playerPeers = Array.from(this.authenticatedPeers.values()).filter((p) => !p.isObserver).length;
+      const totalPlayers = (this.hostPlaysWitcher ? 1 : 0) + playerPeers;
       this.onStatusChangeCallback?.(
         locked
-          ? `Room Locked (${this.authenticatedPeers.size}/${MAX_PLAYERS} Witchers)`
-          : `Hosting Secure Room: ${this.currentRoomCode} (${this.authenticatedPeers.size}/${MAX_PLAYERS} Witchers)`
+          ? `Room Locked (${totalPlayers} ${totalPlayers === 1 ? 'Player' : 'Players'} in Room)`
+          : `Hosting Room: ${this.currentRoomCode} (${totalPlayers} ${totalPlayers === 1 ? 'Player' : 'Players'} in Room)`
       );
     }
   }
@@ -130,23 +135,27 @@ export class P2PManager {
   public setHostPlaysWitcher(plays: boolean) {
     this.hostPlaysWitcher = plays;
     if (this.isHost && this.isConnected) {
-      const maxExt = plays ? MAX_PLAYERS - 1 : MAX_PLAYERS;
+      const playerPeers = Array.from(this.authenticatedPeers.values()).filter((p) => !p.isObserver).length;
+      const totalPlayers = (plays ? 1 : 0) + playerPeers;
       this.onStatusChangeCallback?.(
         plays
-          ? `Hosting: ${this.currentRoomCode} (GM Playing + ${this.authenticatedPeers.size}/${maxExt} Witchers)`
-          : `Hosting: ${this.currentRoomCode} (GM Narrator Mode: ${this.authenticatedPeers.size}/${maxExt} Witchers)`
+          ? `Hosting: ${this.currentRoomCode} (GM Playing Witcher • ${totalPlayers} ${totalPlayers === 1 ? 'Player' : 'Players'})`
+          : `Hosting: ${this.currentRoomCode} (GM Narrator Mode • ${totalPlayers} ${totalPlayers === 1 ? 'Player' : 'Players'})`
       );
     }
   }
 
   public getRoomInfo() {
-    const maxExt = this.hostPlaysWitcher ? MAX_PLAYERS - 1 : MAX_PLAYERS;
+    const playerPeers = Array.from(this.authenticatedPeers.values()).filter((p) => !p.isObserver).length;
+    const totalPlayers = (this.hostPlaysWitcher ? 1 : 0) + playerPeers;
+    const observers = Array.from(this.authenticatedPeers.values()).filter((p) => p.isObserver).length;
     return {
       roomCode: this.currentRoomCode,
       hasPin: this.hasPinProtection,
       isLocked: this.isRoomLocked,
       hostPlaysWitcher: this.hostPlaysWitcher,
-      maxPlayers: maxExt,
+      playersCount: totalPlayers,
+      observersCount: observers,
     };
   }
 
@@ -266,15 +275,12 @@ export class P2PManager {
         return;
       }
 
-      // 2. Check 4-Witcher Party Capacity (Adjusts based on whether GM takes a player slot)
-      const maxExt = this.hostPlaysWitcher ? MAX_PLAYERS - 1 : MAX_PLAYERS;
-      if (this.authenticatedPeers.size >= maxExt) {
+      // 2. Check Room Connection Limit (Allows up to 24 participants including observers)
+      if (this.authenticatedPeers.size >= MAX_ROOM_CAPACITY) {
         const rejectFrame: HandshakeFrame = {
           _witcherHandshake: true,
           step: 'AUTH_REJECT',
-          reason: `Witcher party is full (${this.authenticatedPeers.size}/${maxExt} player slots filled${
-            this.hostPlaysWitcher ? ' with GM' : ''
-          }).`,
+          reason: `Room has reached maximum capacity (${MAX_ROOM_CAPACITY} participants).`,
           ts: Date.now(),
         };
         conn.send(rejectFrame);
@@ -368,22 +374,46 @@ export class P2PManager {
             // Authentication succeeded!
             this.pendingChallenges.delete(remotePeerId);
             const cleanName = (frame.playerName || 'Witcher Companion').slice(0, 50);
+
+            // Determine if peer is a Player or an Observer:
+            // Max 4 Witcher players in the session:
+            // - If GM plays a Witcher, GM takes 1 slot -> up to 3 player peers
+            // - If GM is pure Narrator, GM takes 0 player slots -> up to 4 player peers
+            // Total active participants: max 5 (1 Narrator + 4 Players)
+            // After that, additional connections are observers!
+            const maxPlayerPeers = this.hostPlaysWitcher ? MAX_PLAYERS - 1 : MAX_PLAYERS;
+            const currentPlayerPeers = Array.from(this.authenticatedPeers.values()).filter(
+              (p) => !p.isObserver
+            ).length;
+            const isObserver = currentPlayerPeers >= maxPlayerPeers;
+
             const peerInfo: ConnectedPeerInfo = {
               peerId: remotePeerId,
               playerName: cleanName,
-              school: frame.school,
+              school: isObserver ? undefined : frame.school,
               joinedAt: Date.now(),
               isEncrypted: Boolean(this.roomKey),
+              isObserver,
             };
             this.authenticatedPeers.set(remotePeerId, peerInfo);
             this.notifyPeersUpdated();
+
+            const totalPlayers = (this.hostPlaysWitcher ? 1 : 0) + (isObserver ? currentPlayerPeers : currentPlayerPeers + 1);
+            const totalObservers = Array.from(this.authenticatedPeers.values()).filter((p) => p.isObserver).length;
+
             this.onStatusChangeCallback?.(
-              `${cleanName} authenticated (${this.authenticatedPeers.size}/${MAX_PLAYERS} Witchers)`
+              isObserver
+                ? `${cleanName} connected as Observer (${totalPlayers} Players${totalObservers > 0 ? `, ${totalObservers} Observers` : ''})`
+                : `${cleanName} joined as Player (${totalPlayers} Players in Room)`
             );
 
             const successFrame: HandshakeFrame = {
               _witcherHandshake: true,
               step: 'AUTH_SUCCESS',
+              isObserver,
+              reason: isObserver
+                ? 'Session party is full (4 Players active). You are connected as an Observer.'
+                : undefined,
               ts: Date.now(),
             };
             conn.send(successFrame);
@@ -393,7 +423,12 @@ export class P2PManager {
               type: 'PLAYER_JOIN',
               senderId: remotePeerId,
               senderName: cleanName,
-              payload: { message: `${cleanName} joined the Witcher party (Verified E2EE).` },
+              payload: {
+                message: isObserver
+                  ? `${cleanName} joined as an Observer (Spectating).`
+                  : `${cleanName} joined the Witcher party (Verified E2EE).`,
+                isObserver,
+              },
               timestamp: Date.now(),
             };
             this.onPacketCallback?.(joinPacket);
@@ -467,8 +502,13 @@ export class P2PManager {
       this.notifyPeersUpdated();
 
       if (peerInfo) {
+        const remainingPlayers =
+          (this.hostPlaysWitcher ? 1 : 0) +
+          Array.from(this.authenticatedPeers.values()).filter((p) => !p.isObserver).length;
         this.onStatusChangeCallback?.(
-          `${peerInfo.playerName} disconnected (${this.authenticatedPeers.size}/${MAX_PLAYERS} Witchers)`
+          `${peerInfo.playerName} disconnected (${remainingPlayers} ${
+            remainingPlayers === 1 ? 'Player' : 'Players'
+          } in Room)`
         );
       }
     };
@@ -578,6 +618,7 @@ export class P2PManager {
                     settled = true;
                     clearTimeout(timeoutId);
                     this.isConnected = true;
+                    this.isObserver = Boolean(frame.isObserver);
                     this.authenticatedPeers.set(targetHostId, {
                       peerId: targetHostId,
                       playerName: 'Game Master (Host)',
@@ -586,7 +627,9 @@ export class P2PManager {
                     });
                     this.notifyPeersUpdated();
                     this.onStatusChangeCallback?.(
-                      `Connected & Verified! Room: ${cleanRoom} (AES-256-GCM)`
+                      frame.isObserver
+                        ? `Connected as Observer (Party full). Room: ${cleanRoom}`
+                        : `Connected & Verified! Room: ${cleanRoom} (AES-256-GCM)`
                     );
                     resolve(myId);
                   }
@@ -787,6 +830,7 @@ export class P2PManager {
     this.pendingChallenges.clear();
     this.rateLimitCounters.clear();
     this.seenNonces.clear();
+    this.isObserver = false;
 
     if (this.peer) {
       try {
