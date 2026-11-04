@@ -10,6 +10,7 @@ import { ChatCombatLog } from './components/ChatCombatLog';
 import { P2PModal } from './components/P2PModal';
 import { NotionWikiModal } from './components/NotionWikiModal';
 import { GMCampaignModal } from './components/GMCampaignModal';
+import { InstructionsModal } from './components/InstructionsModal';
 import { storageService, CampaignSaveState } from './services/storageService';
 import { getAssetUrl } from './utils/assets';
 
@@ -111,6 +112,7 @@ export const App: React.FC = () => {
   const [isDiceTrayOpen, setIsDiceTrayOpen] = useState(false);
   const [isNotionModalOpen, setIsNotionModalOpen] = useState(false);
   const [isGMModalOpen, setIsGMModalOpen] = useState(false);
+  const [isInstructionsModalOpen, setIsInstructionsModalOpen] = useState(false);
 
   // Networking state
   const [isConnected, setIsConnected] = useState(false);
@@ -153,7 +155,7 @@ export const App: React.FC = () => {
         senderId: 'system',
         senderName: 'Chronicle of Cintra',
         type: 'system',
-        text: 'Session started: The year is 1184. Four witchers meet at the Lion & Lily Waystation in lower Cintra.',
+        text: 'Session started: The year is 1184. Four witchers meet at the Lion & Lily Waystation in lower Cintra. (Click "How to Play & GM" in the top bar for full rules & instructions).',
         timestamp: Date.now() - 60000,
       },
       {
@@ -622,7 +624,7 @@ export const App: React.FC = () => {
         senderId: 'system',
         senderName: 'Chronicle of Cintra',
         type: 'system',
-        text: 'Session started: The year is 1184. Four witchers meet at the Lion & Lily Waystation in lower Cintra.',
+        text: 'Session started: The year is 1184. Four witchers meet at the Lion & Lily Waystation in lower Cintra. (Click "How to Play & GM" in the top bar for full rules & instructions).',
         timestamp: Date.now() - 60000,
       },
       {
@@ -654,6 +656,7 @@ export const App: React.FC = () => {
         onOpenCharacterSelect={() => setIsCharSelectOpen(true)}
         onOpenNotionModal={() => setIsNotionModalOpen(true)}
         onOpenGMModal={() => setIsGMModalOpen(true)}
+        onOpenInstructionsModal={() => setIsInstructionsModalOpen(true)}
         onToggleDiceTray={() => setIsDiceTrayOpen(!isDiceTrayOpen)}
         isDiceTrayOpen={isDiceTrayOpen}
         activeTab={activeTab}
@@ -690,6 +693,7 @@ export const App: React.FC = () => {
                 currentUserName={selectedCharacter.name}
                 currentUserSchool={selectedCharacter.school}
                 onOpenNotionModal={() => setIsNotionModalOpen(true)}
+                onOpenInstructions={() => setIsInstructionsModalOpen(true)}
               />
             </div>
           </div>
@@ -764,6 +768,7 @@ export const App: React.FC = () => {
         onForceSyncPeers={handleForceSyncPeers}
         playerName={selectedCharacter.name}
         initialRoomFromUrl={initialRoomFromUrl}
+        onOpenInstructions={() => setIsInstructionsModalOpen(true)}
       />
 
       {/* Bestiary Modal (Overlay) */}
@@ -778,6 +783,16 @@ export const App: React.FC = () => {
       <AdventureGuideModal
         isOpen={isGuideModalOpen}
         onClose={() => setIsGuideModalOpen(false)}
+      />
+
+      {/* How to Play & GM Instructions Modal */}
+      <InstructionsModal
+        isOpen={isInstructionsModalOpen}
+        onClose={() => setIsInstructionsModalOpen(false)}
+        onOpenP2P={() => setIsP2PModalOpen(true)}
+        onOpenGuide={() => setIsGuideModalOpen(true)}
+        onOpenGMModal={() => setIsGMModalOpen(true)}
+        onOpenNotionModal={() => setIsNotionModalOpen(true)}
       />
 
       {/* Notion Wiki & Session Chronicle Modal */}

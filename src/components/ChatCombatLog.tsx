@@ -22,6 +22,7 @@ interface ChatCombatLogProps {
   currentUserName?: string;
   currentUserSchool?: WitcherSchool;
   onOpenNotionModal?: () => void;
+  onOpenInstructions?: () => void;
 }
 
 export const ChatCombatLog: React.FC<ChatCombatLogProps> = ({
@@ -29,6 +30,7 @@ export const ChatCombatLog: React.FC<ChatCombatLogProps> = ({
   onSendMessage,
   currentUserName = 'Witcher',
   onOpenNotionModal,
+  onOpenInstructions,
 }) => {
   const [inputText, setInputText] = useState('');
   const [filter, setFilter] = useState<'all' | 'rolls' | 'combat' | 'roleplay'>('all');
@@ -187,6 +189,18 @@ export const ChatCombatLog: React.FC<ChatCombatLogProps> = ({
           <p>• <strong>Browser Requirement:</strong> Google Chrome, Microsoft Edge, or Safari provide the highest quality speech recognition.</p>
           <p>• <strong>Microphone Permission:</strong> When prompted, click <em>"Allow"</em> for microphone access in your browser address bar.</p>
           <p>• <strong>In-Character Mode:</strong> Spoken words are formatted as your Witcher’s quoted dialogue with school attribution.</p>
+          {onOpenInstructions && (
+            <div className="pt-2 border-t border-white/10 flex items-center justify-between">
+              <span className="text-[11px] text-[#717b85]">Need full 5e rules or GM advice?</span>
+              <button
+                type="button"
+                onClick={onOpenInstructions}
+                className="text-[11px] text-[#c99a45] hover:text-[#e2ba6d] font-cinzel font-semibold hover:underline"
+              >
+                Open How to Play & GM Guide →
+              </button>
+            </div>
+          )}
         </div>
       )}
 

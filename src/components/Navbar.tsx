@@ -10,7 +10,8 @@ import {
   Sparkles,
   Map as MapIcon,
   FileText,
-  HardDrive
+  HardDrive,
+  HelpCircle
 } from 'lucide-react';
 import { WitcherCharacter, MapScene } from '../types';
 
@@ -27,6 +28,7 @@ interface NavbarProps {
   onOpenCharacterSelect: () => void;
   onOpenNotionModal: () => void;
   onOpenGMModal: () => void;
+  onOpenInstructionsModal: () => void;
   onToggleDiceTray: () => void;
   isDiceTrayOpen: boolean;
   activeTab: 'map' | 'sheet' | 'bestiary' | 'guide';
@@ -46,6 +48,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenCharacterSelect,
   onOpenNotionModal,
   onOpenGMModal,
+  onOpenInstructionsModal,
   onToggleDiceTray,
   isDiceTrayOpen,
   activeTab,
@@ -132,6 +135,16 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <FileText className="w-3.5 h-3.5 text-[#c99a45]" />
             <span className="hidden lg:inline">Notion Wiki</span>
+          </button>
+
+          <button
+            onClick={onOpenInstructionsModal}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-cinzel text-[#e2ba6d] hover:text-white hover:bg-[#252a2f] border border-[#c99a45]/30 bg-[#c99a45]/10 transition-all shadow-sm shadow-[#c99a45]/10"
+            title="Complete Instructions: How to Play as a Witcher & How to GM the Game"
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-[#c99a45]" />
+            <span className="hidden sm:inline">How to Play & GM</span>
+            <span className="sm:hidden">Guide</span>
           </button>
         </div>
 

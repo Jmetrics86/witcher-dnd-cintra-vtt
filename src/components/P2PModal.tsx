@@ -16,6 +16,7 @@ import {
   Link2,
   ShieldCheck,
   RefreshCw,
+  HelpCircle,
 } from 'lucide-react';
 import { ConnectedPeerInfo } from '../services/peerService';
 
@@ -36,6 +37,7 @@ interface P2PModalProps {
   onForceSyncPeers?: () => void;
   playerName: string;
   initialRoomFromUrl?: string;
+  onOpenInstructions?: () => void;
 }
 
 export const P2PModal: React.FC<P2PModalProps> = ({
@@ -55,6 +57,7 @@ export const P2PModal: React.FC<P2PModalProps> = ({
   onForceSyncPeers,
   playerName,
   initialRoomFromUrl,
+  onOpenInstructions,
 }) => {
   const [activeMode, setActiveMode] = useState<'host' | 'join'>(
     initialRoomFromUrl ? 'join' : 'host'
@@ -564,7 +567,20 @@ export const P2PModal: React.FC<P2PModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3.5 bg-[#121416] border-t border-[#262b30] flex justify-end shrink-0">
+        <div className="px-6 py-3.5 bg-[#121416] border-t border-[#262b30] flex items-center justify-between shrink-0">
+          {onOpenInstructions ? (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onOpenInstructions();
+              }}
+              className="text-xs text-[#c99a45] hover:text-[#e2ba6d] flex items-center gap-1.5 transition-colors font-cinzel hover:underline"
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+              <span>How to Play & GM Guide →</span>
+            </button>
+          ) : <div />}
           <button
             onClick={onClose}
             className="px-4 py-2 bg-[#22272c] hover:bg-[#2e353c] text-xs font-cinzel text-[#d6d9dc] rounded-md transition-colors"
