@@ -8,7 +8,10 @@ import {
   MicOff, 
   Radio, 
   FileText,
-  Sparkles 
+  Sparkles,
+  HelpCircle,
+  Volume2,
+  CheckCircle2
 } from 'lucide-react';
 import { ChatMessage, WitcherSchool, SpeechRoleplayMode } from '../types';
 import { useSpeechToText } from '../hooks/useSpeechToText';
@@ -30,23 +33,39 @@ export const ChatCombatLog: React.FC<ChatCombatLogProps> = ({
   const [inputText, setInputText] = useState('');
   const [filter, setFilter] = useState<'all' | 'rolls' | 'combat' | 'roleplay'>('all');
   const [speechMode, setSpeechMode] = useState<SpeechRoleplayMode>('ic');
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [autoSendOnPause, setAutoSendOnPause] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
-  // Hook for Web Speech API
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const autoSendTimerRef = useRef<any>(null);
+
+  // Hook for Web Speech API & Live Audio Level Meter
   const {
     isSupported,
     isListening,
     interimTranscript,
+    audioLevel,
     startListening,
     stopListening,
     error: speechError,
-  } = useSpeechToText({
-    continuous: true,
-    onTranscriptComplete: (finalText) => {
-      if (finalText.trim()) {
-        onSendMessage(finalText.trim(), speechMode, true);
+  } = useSpeechToText((finalChunk) => {
+    // Append finalized speech to the input box in real time
+    setInputText((prev) => {
+      const updated = prev ? `${prev} ${finalChunk}` : finalChunk;
+      
+      // If Auto-Send is enabled, set a 1.5-second debounce timer to send
+      if (autoSendOnPause) {
+        if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current);
+        autoSendTimerRef.current = setTimeout(() => {
+          if (updated.trim()) {
+            onSendMessage(updated.trim(), speechMode, true);
+            setInputText('');
+          }
+        }, 1500);
       }
-    },
+
+      return updated;
+    });
   });
 
   useEffect(() => {
@@ -57,16 +76,19 @@ export const ChatCombatLog: React.FC<ChatCombatLogProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim()) return;
-    onSendMessage(inputText.trim(), speechMode, false);
+    const textToSend = (inputText + (interimTranscript ? ` ${interimTranscript}` : '')).trim();
+    if (!textToSend) return;
+
+    if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current);
+    onSendMessage(textToSend, speechMode, isListening);
     setInputText('');
   };
 
-  const toggleMic = () => {
+  const toggleMic = async () => {
     if (isListening) {
       stopListening();
     } else {
-      startListening();
+      await startListening();
     }
   };
 
@@ -88,7 +110,7 @@ export const ChatCombatLog: React.FC<ChatCombatLogProps> = ({
   };
 
   return (
-    <div className="bg-[#131517] border border-[#2e343b] rounded-xl overflow-hidden shadow-2xl flex flex-col h-full">
+    <div className="bg-[#131517] border border-[#2e343b] rounded-xl overflow-hidden shadow-2xl flex flex-col h-full relative">
       
       {/* Top Header: Title, Filters & Notion Wiki Sync */}
       <div className="bg-[#181a1d] border-b border-[#282d33] px-3.5 py-2 flex items-center justify-between gap-2">
@@ -137,11 +159,36 @@ export const ChatCombatLog: React.FC<ChatCombatLogProps> = ({
               title="Sync Session to Notion Wiki"
             >
               <FileText className="w-3 h-3 text-[#c99a45]" />
-              <span className="hidden md:inline">Notion Wiki</span>
+              <span className="hidden md:inline">Notion</span>
             </button>
           )}
+
+          {/* Voice Troubleshooting Help */}
+          <button
+            onClick={() => setShowHelp(!showHelp)}
+            className="p-1 rounded text-[#717b85] hover:text-white transition-colors"
+            title="Speech-to-Text Help"
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
+
+      {/* Help Modal Dropdown if toggled */}
+      {showHelp && (
+        <div className="bg-[#1b1f24] border-b border-[#303841] p-3 text-xs text-[#a6b1b9] space-y-1.5 animate-fadeIn">
+          <div className="font-cinzel text-white font-bold flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <Mic className="w-3.5 h-3.5 text-[#c99a45]" />
+              Speech-to-Text Setup Guide
+            </span>
+            <button onClick={() => setShowHelp(false)} className="text-[#8a929a] hover:text-white">✕</button>
+          </div>
+          <p>• <strong>Browser Requirement:</strong> Google Chrome, Microsoft Edge, or Safari provide the highest quality speech recognition.</p>
+          <p>• <strong>Microphone Permission:</strong> When prompted, click <em>"Allow"</em> for microphone access in your browser address bar.</p>
+          <p>• <strong>In-Character Mode:</strong> Spoken words are formatted as your Witcher’s quoted dialogue with school attribution.</p>
+        </div>
+      )}
 
       {/* Messages Scroll Area */}
       <div ref={scrollRef} className="flex-1 p-3.5 overflow-y-auto space-y-2.5 bg-[#0f1012] min-h-[220px]">
@@ -150,7 +197,7 @@ export const ChatCombatLog: React.FC<ChatCombatLogProps> = ({
             <Sparkles className="w-6 h-6 text-[#c99a45]/40 mb-2" />
             <p>Silence over the Cintrian highway camp...</p>
             <p className="text-[11px] text-[#555d65] mt-1">
-              Press the mic button below to record in-character voice speech directly into the chronicle.
+              Click the microphone button to dictate in-character voice speech directly into the chronicle.
             </p>
           </div>
         ) : (
@@ -231,7 +278,7 @@ export const ChatCombatLog: React.FC<ChatCombatLogProps> = ({
                 key={msg.id} 
                 className={`p-2.5 rounded-lg border text-xs transition-all ${
                   msg.isVoiceTranscribed 
-                    ? 'bg-amber-950/15 border-amber-600/30' 
+                    ? 'bg-amber-950/15 border-amber-600/30 shadow-sm' 
                     : isIC 
                     ? 'bg-[#15191d] border-[#29323a]' 
                     : 'bg-[#16181b] border-[#252a30]'
@@ -274,29 +321,47 @@ export const ChatCombatLog: React.FC<ChatCombatLogProps> = ({
             );
           })
         )}
-
-        {/* Live Interim Speech Preview */}
-        {isListening && interimTranscript && (
-          <div className="p-2.5 rounded-lg bg-red-950/30 border border-red-500/40 text-xs text-red-200 animate-pulse flex items-center gap-2">
-            <Mic className="w-3.5 h-3.5 text-red-400 shrink-0" />
-            <span className="italic font-mono text-[11px]">
-              Transcribing ({currentUserName}): "{interimTranscript}"
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Speech Error Banner */}
       {speechError && (
-        <div className="px-3 py-1 bg-rose-950/40 border-t border-rose-500/30 text-rose-300 text-[10px] flex items-center justify-between">
-          <span>{speechError}</span>
+        <div className="px-3 py-1.5 bg-rose-950/50 border-t border-rose-500/40 text-rose-300 text-[11px] flex items-center justify-between">
+          <span className="font-mono">{speechError}</span>
+          <button onClick={() => setShowHelp(true)} className="underline hover:text-white">Help</button>
+        </div>
+      )}
+
+      {/* Active Mic Audio Meter Banner */}
+      {isListening && (
+        <div className="px-3 py-1.5 bg-red-950/30 border-t border-red-500/40 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2">
+            <span className="flex h-2.5 w-2.5 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+            </span>
+            <span className="font-cinzel text-red-300 font-bold text-[11px]">
+              Microphone Active ({currentUserName})
+            </span>
+          </div>
+
+          {/* Volume Meter Bar */}
+          <div className="flex items-center gap-1.5">
+            <Volume2 className="w-3.5 h-3.5 text-red-400" />
+            <div className="w-16 bg-[#20252b] h-2 rounded-full overflow-hidden border border-white/10">
+              <div 
+                className="h-full bg-gradient-to-r from-emerald-500 via-amber-400 to-red-500 transition-all duration-75"
+                style={{ width: `${Math.max(8, audioLevel)}%` }}
+              />
+            </div>
+            <span className="text-[10px] text-[#8a929a] font-mono w-6">{audioLevel}%</span>
+          </div>
         </div>
       )}
 
       {/* Speech Mode Bar */}
       <div className="px-3 py-1.5 bg-[#16181b] border-t border-[#262b30] flex items-center justify-between text-[11px] font-cinzel">
         <div className="flex items-center gap-1.5">
-          <span className="text-[#717b85] text-[10px] uppercase">Speech As:</span>
+          <span className="text-[#717b85] text-[10px] uppercase">Mode:</span>
           <button
             type="button"
             onClick={() => setSpeechMode('ic')}
@@ -326,12 +391,20 @@ export const ChatCombatLog: React.FC<ChatCombatLogProps> = ({
           </button>
         </div>
 
-        {isListening && (
-          <span className="flex items-center gap-1 text-[10px] text-red-400 font-mono animate-pulse">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
-            Recording Live
-          </span>
-        )}
+        {/* Auto Send Toggle */}
+        <button
+          type="button"
+          onClick={() => setAutoSendOnPause(!autoSendOnPause)}
+          className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border transition-colors ${
+            autoSendOnPause 
+              ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300' 
+              : 'border-[#2f353d] text-[#717b85] hover:text-white'
+          }`}
+          title="Automatically sends message after 1.5 seconds of silence"
+        >
+          {autoSendOnPause && <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />}
+          <span>Auto-Send</span>
+        </button>
       </div>
 
       {/* Input Form with Push-To-Talk / Mic Button */}
@@ -344,21 +417,28 @@ export const ChatCombatLog: React.FC<ChatCombatLogProps> = ({
           disabled={!isSupported}
           className={`p-2 rounded-lg border transition-all flex items-center justify-center shrink-0 ${
             isListening 
-              ? 'bg-red-600 text-white border-red-500 ring-2 ring-red-500/50 animate-pulse' 
+              ? 'bg-red-600 text-white border-red-500 ring-2 ring-red-500/50 shadow-lg shadow-red-600/30 animate-pulse' 
               : 'bg-[#1c2024] hover:bg-[#282e35] text-[#c99a45] border-[#343c44] hover:border-[#c99a45]'
           } disabled:opacity-40 disabled:cursor-not-allowed`}
-          title={isListening ? 'Click to Stop Voice Recording' : 'Start Speech-to-Text Recording'}
+          title={isListening ? 'Click to Stop Microphone' : 'Click to Speak (Speech-to-Text)'}
         >
           {isListening ? <Mic className="w-4 h-4 text-white" /> : <MicOff className="w-4 h-4" />}
         </button>
 
-        <input
-          type="text"
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          placeholder={isListening ? 'Listening to voice...' : `Speak or type as ${currentUserName}...`}
-          className="flex-1 bg-[#0b0c0d] border border-[#2e343c] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#c99a45] transition-colors"
-        />
+        {/* Input Text Field (Live transcription streams right here!) */}
+        <div className="flex-1 relative">
+          <input
+            type="text"
+            value={inputText + (interimTranscript ? ` ${interimTranscript}` : '')}
+            onChange={(e) => setInputText(e.target.value)}
+            placeholder={
+              isListening 
+                ? '🎙️ Listening... speak in-character now...' 
+                : `Speak or type as ${currentUserName}...`
+            }
+            className="w-full bg-[#0b0c0d] border border-[#2e343c] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#c99a45] transition-colors"
+          />
+        </div>
 
         <button
           type="submit"
