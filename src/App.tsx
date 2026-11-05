@@ -11,6 +11,7 @@ import { P2PModal } from './components/P2PModal';
 import { NotionWikiModal } from './components/NotionWikiModal';
 import { GMCampaignModal } from './components/GMCampaignModal';
 import { InstructionsModal } from './components/InstructionsModal';
+import { DMInventoryModal } from './components/DMInventoryModal';
 import { storageService, CampaignSaveState } from './services/storageService';
 import { getAssetUrl } from './utils/assets';
 
@@ -26,8 +27,12 @@ import {
   CharacterAssignment,
   StoryVisualOverlay,
   PartyChoiceRecord,
+  CampaignEconomyState,
+  RewardRecord,
+  GameItem,
 } from './types';
 import { PREGEN_WITCHERS } from './data/characters';
+import { INITIAL_ECONOMY_STATE } from './data/items';
 import { MAP_SCENES } from './data/maps';
 import { p2pManager, ConnectedPeerInfo } from './services/peerService';
 import { playCriticalHitSound } from './utils/audio';
@@ -117,6 +122,27 @@ export const App: React.FC = () => {
   const [isNotionModalOpen, setIsNotionModalOpen] = useState(false);
   const [isGMModalOpen, setIsGMModalOpen] = useState(false);
   const [isInstructionsModalOpen, setIsInstructionsModalOpen] = useState(false);
+  const [isDMInventoryModalOpen, setIsDMInventoryModalOpen] = useState(false);
+
+  // Party Characters (all 4 Witcher states, initialized from PREGEN_WITCHERS)
+  const [partyCharacters, setPartyCharacters] = useState<Record<string, WitcherCharacter>>(() => {
+    if (initialSave?.witcherCharacters) {
+      return initialSave.witcherCharacters;
+    }
+    const map: Record<string, WitcherCharacter> = {};
+    PREGEN_WITCHERS.forEach((w) => {
+      map[w.school] = w;
+    });
+    return map;
+  });
+
+  // Finite Campaign Economy State
+  const [economyState, setEconomyState] = useState<CampaignEconomyState>(() => {
+    if (initialSave?.economyState) {
+      return initialSave.economyState;
+    }
+    return INITIAL_ECONOMY_STATE;
+  });
 
   // Networking state
   const [isConnected, setIsConnected] = useState(false);
@@ -213,6 +239,8 @@ export const App: React.FC = () => {
     tokens,
     messages,
     selectedCharacter,
+    partyCharacters,
+    economyState,
     characterAssignments,
     activeStoryVisual,
     partyChoices,
@@ -225,13 +253,15 @@ export const App: React.FC = () => {
       tokens,
       messages,
       selectedCharacter,
+      partyCharacters,
+      economyState,
       characterAssignments,
       activeStoryVisual,
       partyChoices,
       completedSpotlights,
       isHost,
     };
-  }, [currentScene, tokens, messages, selectedCharacter, characterAssignments, activeStoryVisual, partyChoices, completedSpotlights, isHost]);
+  }, [currentScene, tokens, messages, selectedCharacter, partyCharacters, economyState, characterAssignments, activeStoryVisual, partyChoices, completedSpotlights, isHost]);
 
   // Auto-save to Game Master's browser local storage
   useEffect(() => {
@@ -244,8 +274,10 @@ export const App: React.FC = () => {
       activeStoryVisual,
       partyChoices,
       completedSpotlights,
+      economyState,
+      witcherCharacters: partyCharacters,
     });
-  }, [currentScene, tokens, messages, selectedCharacter, characterAssignments, activeStoryVisual, partyChoices, completedSpotlights]);
+  }, [currentScene, tokens, messages, selectedCharacter, partyCharacters, economyState, characterAssignments, activeStoryVisual, partyChoices, completedSpotlights]);
 
   // Handle incoming P2P Packet
   const handleP2PPacket = useCallback((packet: P2PPacket) => {
@@ -259,10 +291,20 @@ export const App: React.FC = () => {
         break;
 
       case 'TOKEN_MOVE': {
-        const { tokenId, x, y } = packet.payload;
-        setTokens((prev) =>
-          prev.map((t) => (t.id === tokenId ? { ...t, x, y } : t))
-        );
+        const { tokenId, x, y, isHostMove, senderSchool } = packet.payload;
+        setTokens((prev) => {
+          const targetToken = prev.find((t) => t.id === tokenId);
+          if (!targetToken) return prev;
+          // Non-host players can ONLY move their own character
+          if (packet.senderId !== 'gm' && !isHostMove) {
+            const isOwner = (targetToken.school && targetToken.school === senderSchool) ||
+                            targetToken.name === packet.senderName;
+            if (!isOwner) {
+              return prev; // Reject unauthorized move
+            }
+          }
+          return prev.map((t) => (t.id === tokenId ? { ...t, x, y } : t));
+        });
         break;
       }
 
@@ -314,6 +356,8 @@ export const App: React.FC = () => {
               partyChoices: gameStateRef.current.partyChoices,
               gmPlaysWitcher: p2pManager.hostPlaysWitcher,
               connectedPeers: p2pManager.getConnectedPeers(),
+              economyState: gameStateRef.current.economyState,
+              partyCharacters: gameStateRef.current.partyCharacters,
             },
             timestamp: Date.now(),
           });
@@ -342,6 +386,12 @@ export const App: React.FC = () => {
         }
         if (packet.payload.connectedPeers && Array.isArray(packet.payload.connectedPeers)) {
           setConnectedPeers(packet.payload.connectedPeers);
+        }
+        if (packet.payload.economyState) {
+          setEconomyState(packet.payload.economyState);
+        }
+        if (packet.payload.partyCharacters) {
+          setPartyCharacters(packet.payload.partyCharacters);
         }
         setIsObserver(p2pManager.isObserver);
         if (packet.payload.characterAssignments) {
@@ -482,6 +532,48 @@ export const App: React.FC = () => {
           setPartyChoices(packet.payload);
         }
         break;
+
+      case 'ECONOMY_SYNC': {
+        if (packet.payload.economyState) {
+          setEconomyState(packet.payload.economyState);
+        }
+        if (packet.payload.partyCharacters) {
+          setPartyCharacters(packet.payload.partyCharacters);
+        } else if (packet.payload.updatedSchool) {
+          const school = packet.payload.updatedSchool as WitcherSchool;
+          setPartyCharacters((prev) => {
+            const current = prev[school];
+            if (!current) return prev;
+            const updatedGold = (current.gold || 0) + (packet.payload.goldDelta || 0);
+            const updatedInventory = packet.payload.awardedItem
+              ? [...(current.inventory || []), packet.payload.awardedItem]
+              : current.inventory;
+            const updated = { ...current, gold: updatedGold, inventory: updatedInventory };
+            if (gameStateRef.current.selectedCharacter.school === school) {
+              setSelectedCharacter(updated);
+            }
+            return { ...prev, [school]: updated };
+          });
+        }
+        break;
+      }
+
+      case 'CHARACTER_UPDATE': {
+        if (packet.payload.updatedFrom && packet.payload.updatedTo) {
+          const { updatedFrom, updatedTo } = packet.payload;
+          setPartyCharacters((prev) => ({
+            ...prev,
+            [updatedFrom.school]: updatedFrom,
+            [updatedTo.school]: updatedTo,
+          }));
+          if (gameStateRef.current.selectedCharacter.school === updatedFrom.school) {
+            setSelectedCharacter(updatedFrom);
+          } else if (gameStateRef.current.selectedCharacter.school === updatedTo.school) {
+            setSelectedCharacter(updatedTo);
+          }
+        }
+        break;
+      }
     }
   }, []);
 
@@ -792,15 +884,35 @@ export const App: React.FC = () => {
 
   // Token Movement
   const handleTokenMove = (tokenId: string, x: number, y: number) => {
+    // Non-host players can ONLY move their own character token!
+    if (!isHost) {
+      const targetToken = tokens.find((t) => t.id === tokenId);
+      const isMyToken = targetToken && (
+        (targetToken.school && targetToken.school === selectedCharacter.school) ||
+        targetToken.name === selectedCharacter.name ||
+        targetToken.id === selectedCharacter.id
+      );
+      if (!isMyToken) {
+        handleAddLogMessage(`⚠️ You can only move your own Witcher character token.`, 'system');
+        return;
+      }
+    }
+
     setTokens((prev) =>
       prev.map((t) => (t.id === tokenId ? { ...t, x, y } : t))
     );
 
     p2pManager.send({
       type: 'TOKEN_MOVE',
-      senderId: selectedCharacter.id,
-      senderName: selectedCharacter.name,
-      payload: { tokenId, x, y },
+      senderId: isHost ? 'gm' : selectedCharacter.id,
+      senderName: isHost ? 'Game Master' : selectedCharacter.name,
+      payload: { 
+        tokenId, 
+        x, 
+        y,
+        isHostMove: isHost,
+        senderSchool: selectedCharacter.school,
+      },
       timestamp: Date.now(),
     });
   };
@@ -952,7 +1064,7 @@ export const App: React.FC = () => {
 
   // Open Character Sheet for a specific Witcher School directly from Map Token
   const handleOpenWitcherSheet = (school: WitcherSchool) => {
-    const found = PREGEN_WITCHERS.find((w) => w.school === school);
+    const found = partyCharacters[school] || PREGEN_WITCHERS.find((w) => w.school === school);
     if (found) {
       const matchingToken = tokens.find((t) => t.school === school || t.name === found.name);
       if (matchingToken && matchingToken.currentHp !== undefined) {
@@ -967,6 +1079,10 @@ export const App: React.FC = () => {
   // Update Character from CharacterSheet — Linked directly to Map Tokens!
   const handleUpdateCharacter = (updated: WitcherCharacter) => {
     setSelectedCharacter(updated);
+    setPartyCharacters((prev) => ({
+      ...prev,
+      [updated.school]: updated,
+    }));
 
     // Synchronize to the Map Token for this Witcher!
     setTokens((prev) =>
@@ -993,6 +1109,195 @@ export const App: React.FC = () => {
             : t
         ),
       },
+      timestamp: Date.now(),
+    });
+  };
+
+  // Award finite reward (gold, item) to a Witcher from the DM Vault
+  const handleAwardReward = (
+    recipientSchool: WitcherSchool,
+    goldAmount: number,
+    itemId: string | null,
+    reasonType: 'roleplay' | 'exploration' | 'investigation' | 'combat' | 'custom',
+    note: string
+  ) => {
+    let rewardedItem: GameItem | null = null;
+    let newVaultItems = [...economyState.vaultItems];
+    let newVaultGold = economyState.dmVaultGold;
+
+    if (goldAmount > 0) {
+      newVaultGold = Math.max(0, newVaultGold - goldAmount);
+    }
+
+    if (itemId) {
+      const idx = newVaultItems.findIndex((i) => i.id === itemId);
+      if (idx !== -1) {
+        rewardedItem = { ...newVaultItems[idx], assignedToSchool: recipientSchool };
+        newVaultItems.splice(idx, 1);
+      }
+    }
+
+    const recipientChar = partyCharacters[recipientSchool] || PREGEN_WITCHERS.find((w) => w.school === recipientSchool);
+    const recipientName = recipientChar?.name || recipientSchool;
+
+    const newLogRecord: RewardRecord = {
+      id: `reward-${Date.now()}`,
+      timestamp: Date.now(),
+      recipientSchool,
+      recipientName,
+      type: reasonType,
+      amountGold: goldAmount > 0 ? goldAmount : undefined,
+      itemName: rewardedItem ? rewardedItem.name : undefined,
+      note,
+    };
+
+    const newEconomy: CampaignEconomyState = {
+      ...economyState,
+      dmVaultGold: newVaultGold,
+      vaultItems: newVaultItems,
+      rewardLog: [...economyState.rewardLog, newLogRecord],
+    };
+    setEconomyState(newEconomy);
+
+    setPartyCharacters((prev) => {
+      const current = prev[recipientSchool] || PREGEN_WITCHERS.find((w) => w.school === recipientSchool);
+      if (!current) return prev;
+      const updatedInventory = rewardedItem ? [...(current.inventory || []), rewardedItem] : current.inventory;
+      const updatedGold = (current.gold || 0) + goldAmount;
+      const updatedChar = { ...current, gold: updatedGold, inventory: updatedInventory };
+
+      if (selectedCharacter.school === recipientSchool) {
+        setSelectedCharacter(updatedChar);
+      }
+      return { ...prev, [recipientSchool]: updatedChar };
+    });
+
+    const rewardSummary = [
+      goldAmount > 0 ? `🪙 ${goldAmount} Orens` : '',
+      rewardedItem ? `📦 ${rewardedItem.name}` : '',
+    ].filter(Boolean).join(' and ');
+
+    handleAddLogMessage(
+      `🏆 [GM Reward] ${recipientName} earned ${rewardSummary} for ${reasonType.toUpperCase()}! ("${note}")`,
+      'lore'
+    );
+
+    p2pManager.send({
+      type: 'ECONOMY_SYNC',
+      senderId: 'gm',
+      senderName: 'Game Master',
+      payload: {
+        economyState: newEconomy,
+        updatedSchool: recipientSchool,
+        goldDelta: goldAmount,
+        awardedItem: rewardedItem,
+      },
+      timestamp: Date.now(),
+    });
+  };
+
+  // Reclaim an item from a Witcher's inventory back to the DM Vault
+  const handleReclaimItem = (itemId: string) => {
+    let foundItem: GameItem | null = null;
+    let holderSchool: WitcherSchool | null = null;
+
+    Object.entries(partyCharacters).forEach(([school, char]) => {
+      const item = (char.inventory || []).find((i) => i.id === itemId);
+      if (item) {
+        foundItem = { ...item, assignedToSchool: 'DM_VAULT' };
+        holderSchool = school as WitcherSchool;
+      }
+    });
+
+    const itemToReclaim = foundItem as GameItem | null;
+    if (!itemToReclaim || !holderSchool) return;
+
+    setPartyCharacters((prev) => {
+      const char = prev[holderSchool!];
+      if (!char) return prev;
+      const updatedChar = {
+        ...char,
+        inventory: (char.inventory || []).filter((i) => i.id !== itemId),
+      };
+      if (selectedCharacter.school === holderSchool) {
+        setSelectedCharacter(updatedChar);
+      }
+      return { ...prev, [holderSchool!]: updatedChar };
+    });
+
+    const newEconomy: CampaignEconomyState = {
+      ...economyState,
+      vaultItems: [...economyState.vaultItems, itemToReclaim],
+    };
+    setEconomyState(newEconomy);
+
+    handleAddLogMessage(`🏛️ ${itemToReclaim.name} reclaimed to DM Vault.`, 'system');
+
+    p2pManager.send({
+      type: 'ECONOMY_SYNC',
+      senderId: 'gm',
+      senderName: 'Game Master',
+      payload: {
+        economyState: newEconomy,
+        reclaimedItemId: itemId,
+      },
+      timestamp: Date.now(),
+    });
+  };
+
+  // Transfer item or gold between Witchers
+  const handleTransferItemOrGold = (
+    toSchool: WitcherSchool,
+    itemId?: string,
+    goldAmount?: number
+  ) => {
+    const fromSchool = selectedCharacter.school;
+    if (fromSchool === toSchool) return;
+
+    const fromChar = partyCharacters[fromSchool] || selectedCharacter;
+    const toChar = partyCharacters[toSchool] || PREGEN_WITCHERS.find((w) => w.school === toSchool);
+    if (!fromChar || !toChar) return;
+
+    let transferredItem: GameItem | undefined;
+    let newFromInventory = [...(fromChar.inventory || [])];
+    let newToInventory = [...(toChar.inventory || [])];
+
+    if (itemId) {
+      const idx = newFromInventory.findIndex((i) => i.id === itemId);
+      if (idx !== -1) {
+        transferredItem = { ...newFromInventory[idx], assignedToSchool: toSchool };
+        newFromInventory.splice(idx, 1);
+        newToInventory.push(transferredItem);
+      }
+    }
+
+    const goldToMove = goldAmount && goldAmount > 0 ? Math.min(fromChar.gold || 0, goldAmount) : 0;
+    const newFromGold = (fromChar.gold || 0) - goldToMove;
+    const newToGold = (toChar.gold || 0) + goldToMove;
+
+    const updatedFrom = { ...fromChar, gold: newFromGold, inventory: newFromInventory };
+    const updatedTo = { ...toChar, gold: newToGold, inventory: newToInventory };
+
+    setPartyCharacters((prev) => ({
+      ...prev,
+      [fromSchool]: updatedFrom,
+      [toSchool]: updatedTo,
+    }));
+
+    setSelectedCharacter(updatedFrom);
+
+    const details = [
+      goldToMove > 0 ? `🪙 ${goldToMove} Orens` : '',
+      transferredItem ? `📦 ${transferredItem.name}` : '',
+    ].filter(Boolean).join(' and ');
+
+    handleAddLogMessage(`🤝 ${fromChar.name} gave ${details} to ${toChar.name}.`, 'chat');
+
+    p2pManager.send({
+      type: 'CHARACTER_UPDATE',
+      senderId: selectedCharacter.id,
+      senderName: selectedCharacter.name,
+      payload: { updatedFrom, updatedTo },
       timestamp: Date.now(),
     });
   };
@@ -1392,6 +1697,7 @@ export const App: React.FC = () => {
         onOpenNotionModal={() => setIsNotionModalOpen(true)}
         onOpenGMModal={() => setIsGMModalOpen(true)}
         onOpenInstructionsModal={() => setIsInstructionsModalOpen(true)}
+        onOpenDMInventoryModal={() => setIsDMInventoryModalOpen(true)}
         onToggleDiceTray={() => setIsDiceTrayOpen(!isDiceTrayOpen)}
         isDiceTrayOpen={isDiceTrayOpen}
         activeTab={activeTab}
@@ -1444,9 +1750,11 @@ export const App: React.FC = () => {
           <div className="max-w-4xl mx-auto w-full">
             <CharacterSheet
               character={selectedCharacter}
+              partyCharacters={partyCharacters}
               onUpdateCharacter={handleUpdateCharacter}
               onRollDice={handleRollDice}
               onAddLogMessage={handleAddLogMessage}
+              onTransferItemOrGold={handleTransferItemOrGold}
             />
           </div>
         )}
@@ -1585,6 +1893,17 @@ export const App: React.FC = () => {
         onLoadCampaignState={handleLoadCampaignState}
         onForceSyncPeers={handleForceSyncPeers}
         onResetCampaign={handleResetCampaign}
+      />
+
+      {/* DM Screen Inventory & Finite Reward Vault Modal */}
+      <DMInventoryModal
+        isOpen={isDMInventoryModalOpen}
+        onClose={() => setIsDMInventoryModalOpen(false)}
+        isHost={isHost}
+        economyState={economyState}
+        characters={partyCharacters}
+        onAwardReward={handleAwardReward}
+        onReclaimItem={handleReclaimItem}
       />
 
     </div>

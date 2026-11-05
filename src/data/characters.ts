@@ -1,5 +1,6 @@
 import { WitcherCharacter } from '../types';
 import { getAssetUrl } from '../utils/assets';
+import { STARTER_ARMOR_SETS, MASTER_FINITE_ITEMS, INITIAL_WITCHER_GOLD } from './items';
 
 export const PREGEN_WITCHERS: WitcherCharacter[] = [
   {
@@ -129,6 +130,9 @@ With autumn frost already biting the high passes back to Kaer Morhen, Vane needs
       ],
       personalStakeInContract: 'Your mentor Master Rennard at Kaer Morhen once warned you about the "Treaty of Marnadal"—an ancient pact between Cintrian kings and the primeval forest guardians. You suspect this contract is a cover-up for a broken royal oath.',
     },
+    gold: INITIAL_WITCHER_GOLD,
+    equippedArmor: STARTER_ARMOR_SETS.Wolf,
+    inventory: MASTER_FINITE_ITEMS.filter((i) => i.assignedToSchool === 'Wolf'),
   },
   {
     id: 'witcher-cat',
@@ -256,6 +260,9 @@ She knows how nobles think, how spies lie, and how daggers are hidden behind vel
       ],
       personalStakeInContract: 'You recognized one of Baron Raymond\'s personal outriders on the highway—a black-ops mercenary who once hired the Cat Caravan for political wetwork. You know the Baron is hiding something lucrative enough to blackmail him for double the bounty.',
     },
+    gold: INITIAL_WITCHER_GOLD,
+    equippedArmor: STARTER_ARMOR_SETS.Cat,
+    inventory: MASTER_FINITE_ITEMS.filter((i) => i.assignedToSchool === 'Cat'),
   },
   {
     id: 'witcher-griffin',
@@ -383,6 +390,9 @@ Now returning to his ancestral homeland of Cintra for the first time in twenty-f
       ],
       personalStakeInContract: 'Your deceased grandfather was a sworn banner-knight of Marnadal who taught you the nursery rhyme of King Elidyr\'s Sun Stone. Discovering that Baron Raymond desecrated your homeland\'s most sacred covenant is a personal dishonor you must set right.',
     },
+    gold: INITIAL_WITCHER_GOLD,
+    equippedArmor: STARTER_ARMOR_SETS.Griffin,
+    inventory: MASTER_FINITE_ITEMS.filter((i) => i.assignedToSchool === 'Griffin'),
   },
   {
     id: 'witcher-bear',
@@ -508,5 +518,8 @@ Bram rarely travels with companions—Bear doctrine teaches that relying on anot
       ],
       personalStakeInContract: 'You have been hunting the Primeval Chort of the Yaruga for three weeks since it gored a dwarf-smith friend of yours in the foothills. You want its third-eye mutagen and its horns—and nothing in Cintra will stand in your way.',
     },
+    gold: INITIAL_WITCHER_GOLD,
+    equippedArmor: STARTER_ARMOR_SETS.Bear,
+    inventory: MASTER_FINITE_ITEMS.filter((i) => i.assignedToSchool === 'Bear'),
   },
 ];

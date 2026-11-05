@@ -48,6 +48,73 @@ export interface WitcherAbilityScores {
   cha: number;
 }
 
+export type ItemCategory = 
+  | 'armor' 
+  | 'steel_sword' 
+  | 'silver_sword' 
+  | 'potion' 
+  | 'bomb' 
+  | 'oil' 
+  | 'relic' 
+  | 'quest';
+
+export interface ArmorSet {
+  id: string;
+  name: string;
+  armorClass: number;
+  weightCategory: 'Light' | 'Medium' | 'Heavy';
+  perks: string[];
+  description: string;
+  valueGold: number;
+}
+
+export interface GameItem {
+  id: string;
+  name: string;
+  category: ItemCategory;
+  description: string;
+  rarity: 'Common' | 'Masterwork' | 'Relic' | 'Witcher';
+  valueGold: number;
+  equipped?: boolean;
+  // Armor Stats
+  armorClass?: number;
+  weightCategory?: 'Light' | 'Medium' | 'Heavy';
+  // Weapon Stats
+  damage?: string;
+  damageType?: string;
+  attackBonus?: number;
+  properties?: string[];
+  isSilver?: boolean;
+  // Consumable Stats
+  effect?: string;
+  charges?: number;
+  maxCharges?: number;
+  toxicity?: number;
+  duration?: string;
+  // Ownership tracking (finite universe of items)
+  assignedToSchool?: WitcherSchool | 'DM_VAULT';
+  assignedToName?: string;
+  discoverySource?: string;
+}
+
+export interface RewardRecord {
+  id: string;
+  timestamp: number;
+  recipientSchool: WitcherSchool;
+  recipientName: string;
+  type: 'roleplay' | 'exploration' | 'investigation' | 'combat' | 'item_grant' | 'custom';
+  amountGold?: number;
+  itemName?: string;
+  note: string;
+}
+
+export interface CampaignEconomyState {
+  totalRealmGold: number;
+  dmVaultGold: number;
+  vaultItems: GameItem[];
+  rewardLog: RewardRecord[];
+}
+
 export interface WitcherWeapon {
   name: string;
   attackBonus: number;
@@ -98,6 +165,9 @@ export interface WitcherCharacter {
   ideal: string;
   bond: string;
   avatarUrl: string;
+  gold: number; // Cintrian Orens (Finite currency)
+  equippedArmor?: ArmorSet; // Simplified complete armor set
+  inventory: GameItem[]; // Weapons, potions, relics, quest items
   roleplayGuide?: WitcherRoleplayGuide;
 }
 
@@ -280,7 +350,8 @@ export interface P2PPacket {
     | 'CHARACTER_CLAIM'
     | 'CHARACTER_ASSIGNMENT_SYNC'
     | 'STORY_VISUAL_SYNC'
-    | 'PARTY_CHOICES_SYNC';
+    | 'PARTY_CHOICES_SYNC'
+    | 'ECONOMY_SYNC';
   senderId: string;
   senderName: string;
   payload: any;

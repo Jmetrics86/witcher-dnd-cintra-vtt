@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Grid, 
   MapPin, 
@@ -11,7 +11,10 @@ import {
   Shield,
   X,
   Link as LinkIcon,
-  Skull
+  Skull,
+  GripHorizontal,
+  Lock,
+  RotateCcw
 } from 'lucide-react';
 import { MapScene, MapToken, WitcherCharacter, StoryVisualOverlay, WitcherSchool } from '../types';
 import { MAP_SCENES } from '../data/maps';
@@ -64,12 +67,74 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
   const [customHpDelta, setCustomHpDelta] = useState<string>('');
   const mapRef = useRef<HTMLDivElement>(null);
 
+  // DRAGGABLE FLOATING HUD POSITION
+  // Clamped within map bounds so it doesn't block the top-left or any map area
+  const [hudPos, setHudPos] = useState<{ x: number; y: number }>({ x: 16, y: 16 });
+  const [isDraggingHud, setIsDraggingHud] = useState(false);
+  const dragStartRef = useRef<{ mouseX: number; mouseY: number; startX: number; startY: number } | null>(null);
+
   // Find corresponding Act Story Visual for quick toggle
   const currentActStoryVisual = WITCHER_ADVENTURE.acts.find(
     (act) => act.act === currentScene.actNumber
   )?.storyVisuals?.[0];
 
   const selectedToken = tokens.find((t) => t.id === selectedTokenId);
+
+  // TOKEN MOVEMENT PERMISSIONS:
+  // GM (isHost) can move ANY token (monsters, NPCs, witchers).
+  // Players (!isHost) can ONLY move their own specific character token!
+  const isMyToken = selectedToken && (
+    (selectedToken.school && selectedToken.school === selectedCharacter?.school) ||
+    selectedToken.name === selectedCharacter?.name ||
+    selectedToken.id === selectedCharacter?.id
+  );
+  const canMoveSelectedToken = Boolean(isHost || isMyToken);
+
+  // Dragging event listeners for HUD
+  useEffect(() => {
+    if (!isDraggingHud) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!dragStartRef.current || !mapRef.current) return;
+      const rect = mapRef.current.getBoundingClientRect();
+      const deltaX = e.clientX - dragStartRef.current.mouseX;
+      const deltaY = e.clientY - dragStartRef.current.mouseY;
+
+      // Clamping within map container boundaries
+      const newX = Math.max(10, Math.min(Math.max(10, rect.width - 330), dragStartRef.current.startX + deltaX));
+      const newY = Math.max(10, Math.min(Math.max(10, rect.height - 220), dragStartRef.current.startY + deltaY));
+
+      setHudPos({ x: newX, y: newY });
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingHud(false);
+      dragStartRef.current = null;
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingHud]);
+
+  const handleHudDragStart = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsDraggingHud(true);
+    dragStartRef.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      startX: hudPos.x,
+      startY: hudPos.y,
+    };
+  };
+
+  const handleResetHudPos = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setHudPos({ x: 16, y: 16 });
+  };
 
   // Handle map canvas click
   const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -83,8 +148,11 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
       return;
     }
 
-    // If moving selected token, reposition it
+    // If moving selected token, reposition it ONLY IF PERMITTED
     if (selectedTokenId) {
+      if (!canMoveSelectedToken) {
+        return; // Non-host players cannot move tokens that are not their own!
+      }
       onTokenMove(selectedTokenId, x, y);
       // Keep selected so user can adjust HP or see token info
     }
@@ -429,12 +497,56 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
               );
             })}
 
-            {/* FLOATING TOKEN HEALTH CONTROLLER & ACTION HUD */}
+            {/* FLOATING TOKEN HEALTH CONTROLLER & ACTION HUD (DRAGGABLE ANYWHERE) */}
             {selectedToken && (
               <div 
                 onClick={(e) => e.stopPropagation()}
-                className="absolute top-4 left-4 z-40 w-80 max-w-[calc(100vw-32px)] bg-[#101215]/95 border-2 border-[#c99a45] shadow-2xl rounded-xl p-3.5 backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-150 text-[#d6d9dc]"
+                style={{
+                  left: `${hudPos.x}px`,
+                  top: `${hudPos.y}px`,
+                }}
+                className={`absolute z-40 w-80 max-w-[calc(100vw-32px)] bg-[#101215]/95 border-2 ${
+                  isMyToken ? 'border-[#c99a45]' : isHost ? 'border-amber-600' : 'border-[#38414b]'
+                } shadow-2xl rounded-xl p-3.5 backdrop-blur-md animate-in fade-in duration-150 text-[#d6d9dc] select-none`}
               >
+                {/* Drag Handle & Permissions Top Bar */}
+                <div 
+                  onMouseDown={handleHudDragStart}
+                  className="flex items-center justify-between pb-2 mb-2 border-b border-[#262c33] cursor-grab active:cursor-grabbing hover:bg-white/5 -mx-2 -mt-1 px-2 pt-1 rounded-t-lg transition-colors group"
+                  title="Click and drag to reposition sheet HUD anywhere on the map"
+                >
+                  <div className="flex items-center gap-1.5 text-[10px] text-[#8a929a] group-hover:text-[#c99a45] transition-colors font-cinzel">
+                    <GripHorizontal className="w-3.5 h-3.5" />
+                    <span>Move HUD</span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {/* Permission Badge */}
+                    {isHost ? (
+                      <span className="text-[9px] font-cinzel px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">
+                        👑 GM Control
+                      </span>
+                    ) : isMyToken ? (
+                      <span className="text-[9px] font-cinzel px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold">
+                        ⚔️ Your Character
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-cinzel px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold flex items-center gap-1">
+                        <Lock className="w-2.5 h-2.5" />
+                        <span>Read Only</span>
+                      </span>
+                    )}
+
+                    <button
+                      onClick={handleResetHudPos}
+                      className="p-0.5 rounded text-[#6d7680] hover:text-white hover:bg-white/10"
+                      title="Reset HUD to top-left corner"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+
                 {/* HUD Header */}
                 <div className="flex items-start justify-between gap-2.5 pb-2 border-b border-[#262c33]">
                   <div className="flex items-center gap-2.5 min-w-0">
@@ -630,8 +742,17 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
                     )}
                   </div>
 
-                  <p className="text-[10px] text-[#6f7882] font-mono text-center pt-0.5">
-                    Click anywhere on the map to reposition token
+                  <p className="text-[10px] font-mono text-center pt-0.5">
+                    {canMoveSelectedToken ? (
+                      <span className="text-[#8a929a]">
+                        Click anywhere on the map to reposition token
+                      </span>
+                    ) : (
+                      <span className="text-rose-400/90 flex items-center justify-center gap-1">
+                        <Lock className="w-3 h-3 text-rose-400" />
+                        <span>Only the Game Master can move this token</span>
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>
@@ -654,10 +775,17 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
         </div>
 
         {selectedTokenId && (
-          <div className="text-[11px] text-amber-300 font-cinzel bg-amber-950/40 px-2.5 py-0.5 rounded border border-amber-500/30 flex items-center gap-1.5 shrink-0 animate-pulse">
-            <Compass className="w-3.5 h-3.5" />
-            <span>Click map to move token</span>
-          </div>
+          canMoveSelectedToken ? (
+            <div className="text-[11px] text-amber-300 font-cinzel bg-amber-950/40 px-2.5 py-0.5 rounded border border-amber-500/30 flex items-center gap-1.5 shrink-0 animate-pulse">
+              <Compass className="w-3.5 h-3.5" />
+              <span>Click map to move {isHost && !isMyToken ? `${selectedToken?.name} (GM)` : 'token'}</span>
+            </div>
+          ) : (
+            <div className="text-[11px] text-rose-300 font-cinzel bg-rose-950/40 px-2.5 py-0.5 rounded border border-rose-500/30 flex items-center gap-1.5 shrink-0">
+              <Lock className="w-3.5 h-3.5 text-rose-400" />
+              <span>Viewing token (Only GM or owner can move)</span>
+            </div>
+          )
         )}
       </div>
 

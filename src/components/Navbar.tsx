@@ -15,7 +15,8 @@ import {
   Lock,
   Crown,
   ChevronDown,
-  Layers
+  Layers,
+  Coins
 } from 'lucide-react';
 import { WitcherCharacter, MapScene } from '../types';
 
@@ -37,6 +38,7 @@ interface NavbarProps {
   onOpenNotionModal: () => void;
   onOpenGMModal: () => void;
   onOpenInstructionsModal: () => void;
+  onOpenDMInventoryModal?: () => void;
   onToggleDiceTray: () => void;
   isDiceTrayOpen: boolean;
   activeTab: 'map' | 'sheet' | 'bestiary' | 'guide';
@@ -61,6 +63,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenNotionModal,
   onOpenGMModal,
   onOpenInstructionsModal,
+  onOpenDMInventoryModal,
   onToggleDiceTray,
   isDiceTrayOpen,
   activeTab,
@@ -228,6 +231,25 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </div>
                 </button>
 
+                {/* GM Screen Inventory & Reward Vault */}
+                {isHost && onOpenDMInventoryModal && (
+                  <div className="border-t border-[#22272d] my-1 pt-1">
+                    <button
+                      onClick={() => {
+                        setIsCompendiumOpen(false);
+                        onOpenDMInventoryModal();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-xs font-cinzel text-amber-300 hover:text-white hover:bg-amber-950/40 border border-amber-500/30 transition-colors group"
+                    >
+                      <Coins className="w-4 h-4 text-amber-400 shrink-0 group-hover:scale-110 transition-transform" />
+                      <div>
+                        <div className="font-bold text-amber-300 group-hover:text-amber-200">DM Inventory & Vault</div>
+                        <div className="text-[10px] text-amber-400/80 font-mono">Finite Gold, Swords & Rewards</div>
+                      </div>
+                    </button>
+                  </div>
+                )}
+
                 {/* GM Save & Local Backup */}
                 <div className="border-t border-[#22272d] my-1 pt-1">
                   <button
@@ -284,6 +306,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               </span>
             )}
           </button>
+
+          {/* DM Vault Direct Button for Host */}
+          {isHost && onOpenDMInventoryModal && (
+            <button
+              onClick={onOpenDMInventoryModal}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-950/40 hover:bg-amber-900/60 border border-amber-500/40 text-amber-300 text-xs font-cinzel font-bold shadow transition-colors"
+              title="Open DM Screen Inventory & Reward Vault"
+            >
+              <Coins className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">DM Vault</span>
+            </button>
+          )}
 
           {/* P2P Multiplayer Button */}
           <button

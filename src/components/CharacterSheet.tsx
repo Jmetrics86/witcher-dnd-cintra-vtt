@@ -9,29 +9,29 @@ import {
   Flame, 
   Wind, 
   Activity, 
-  RotateCcw,
-  Sparkles,
-  BookOpen,
-  MessageSquare,
-  Users,
-  Compass,
-  Award,
-  Feather
+  RotateCcw, 
+  Sparkles, 
+  BookOpen, 
+  MessageSquare, 
+  Users, 
+  Compass, 
+  Award, 
+  Feather,
+  Coins,
+  Package,
+  ArrowRightLeft
 } from 'lucide-react';
-import { WitcherCharacter, WitcherSignName } from '../types';
+import { WitcherCharacter, WitcherSignName, GameItem, ArmorSet, WitcherSchool } from '../types';
 import { WITCHER_SIGNS } from '../data/signs';
-import { 
-  playSignSound, 
-  playSwordClash, 
-  playPotionDrink, 
-  playDiceRollSound 
-} from '../utils/audio';
+import { playDiceRollSound } from '../utils/audio';
 
 interface CharacterSheetProps {
   character: WitcherCharacter;
+  partyCharacters?: Record<string, WitcherCharacter>;
   onUpdateCharacter: (updated: WitcherCharacter) => void;
   onRollDice: (title: string, formula: string, modifier: number) => void;
   onAddLogMessage: (text: string, type: 'chat' | 'combat' | 'lore' | 'system') => void;
+  onTransferItemOrGold?: (toSchool: WitcherSchool, itemId?: string, goldAmount?: number) => void;
 }
 
 export const CharacterSheet: React.FC<CharacterSheetProps> = ({
@@ -39,8 +39,171 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
   onUpdateCharacter,
   onRollDice,
   onAddLogMessage,
+  onTransferItemOrGold,
 }) => {
-  const [activeSheetTab, setActiveSheetTab] = useState<'combat' | 'alchemy' | 'skills' | 'lore'>('combat');
+  const [activeSheetTab, setActiveSheetTab] = useState<'combat' | 'inventory' | 'alchemy' | 'skills' | 'lore'>('combat');
+  const [transferTargetSchool, setTransferTargetSchool] = useState<WitcherSchool>('Cat');
+  const [transferCoinAmount, setTransferCoinAmount] = useState<string>('10');
+
+  // Equip an Armor Set from Inventory
+  const handleEquipArmor = (armorItem: GameItem) => {
+    const prevArmor = character.equippedArmor;
+    const newArmorSet: ArmorSet = {
+      id: armorItem.id,
+      name: armorItem.name,
+      armorClass: armorItem.armorClass || 15,
+      weightCategory: armorItem.weightCategory || 'Medium',
+      perks: armorItem.properties || [],
+      description: armorItem.description,
+      valueGold: armorItem.valueGold,
+    };
+
+    let updatedInventory = (character.inventory || []).filter((i) => i.id !== armorItem.id);
+    if (prevArmor) {
+      updatedInventory.push({
+        id: prevArmor.id,
+        name: prevArmor.name,
+        category: 'armor',
+        description: prevArmor.description,
+        rarity: 'Witcher',
+        valueGold: prevArmor.valueGold,
+        armorClass: prevArmor.armorClass,
+        weightCategory: prevArmor.weightCategory,
+        properties: prevArmor.perks,
+        equipped: false,
+        assignedToSchool: character.school,
+      });
+    }
+
+    onUpdateCharacter({
+      ...character,
+      armorClass: newArmorSet.armorClass,
+      equippedArmor: newArmorSet,
+      inventory: updatedInventory,
+    });
+
+    onAddLogMessage(`🛡️ ${character.name} donned ${newArmorSet.name} (AC: ${newArmorSet.armorClass}).`, 'combat');
+  };
+
+  // Equip a Steel Sword from Inventory
+  const handleEquipSteelSword = (weaponItem: GameItem) => {
+    const prevWeapon = character.steelWeapon;
+    const newSteel = {
+      name: weaponItem.name,
+      attackBonus: weaponItem.attackBonus || 7,
+      damage: weaponItem.damage || '1d8 + 4 (1d10 + 4 versatile)',
+      damageType: weaponItem.damageType || 'Slashing (Steel)',
+      properties: weaponItem.properties || ['Versatile', 'Finesse'],
+      description: weaponItem.description,
+      isSilver: false,
+    };
+
+    let updatedInventory = (character.inventory || []).filter((i) => i.id !== weaponItem.id);
+    if (prevWeapon) {
+      updatedInventory.push({
+        id: `steel-${Date.now()}`,
+        name: prevWeapon.name,
+        category: 'steel_sword',
+        description: prevWeapon.description,
+        rarity: 'Witcher',
+        valueGold: 100,
+        attackBonus: prevWeapon.attackBonus,
+        damage: prevWeapon.damage,
+        damageType: prevWeapon.damageType,
+        properties: prevWeapon.properties,
+        equipped: false,
+        assignedToSchool: character.school,
+      });
+    }
+
+    onUpdateCharacter({
+      ...character,
+      steelWeapon: newSteel,
+      inventory: updatedInventory,
+    });
+
+    onAddLogMessage(`⚔️ ${character.name} equipped ${newSteel.name} as Steel weapon.`, 'combat');
+  };
+
+  // Equip a Silver Sword from Inventory
+  const handleEquipSilverSword = (weaponItem: GameItem) => {
+    const prevWeapon = character.silverWeapon;
+    const newSilver = {
+      name: weaponItem.name,
+      attackBonus: weaponItem.attackBonus || 7,
+      damage: weaponItem.damage || '1d8 + 4 (+2d6 silver)',
+      damageType: weaponItem.damageType || 'Silver / Slashing',
+      properties: weaponItem.properties || ['Versatile', 'Silver'],
+      description: weaponItem.description,
+      isSilver: true,
+    };
+
+    let updatedInventory = (character.inventory || []).filter((i) => i.id !== weaponItem.id);
+    if (prevWeapon) {
+      updatedInventory.push({
+        id: `silver-${Date.now()}`,
+        name: prevWeapon.name,
+        category: 'silver_sword',
+        description: prevWeapon.description,
+        rarity: 'Witcher',
+        valueGold: 130,
+        attackBonus: prevWeapon.attackBonus,
+        damage: prevWeapon.damage,
+        damageType: prevWeapon.damageType,
+        properties: prevWeapon.properties,
+        isSilver: true,
+        equipped: false,
+        assignedToSchool: character.school,
+      });
+    }
+
+    onUpdateCharacter({
+      ...character,
+      silverWeapon: newSilver,
+      inventory: updatedInventory,
+    });
+
+    onAddLogMessage(`🗡️ ${character.name} unsheathed ${newSilver.name} as active Silver sword.`, 'combat');
+  };
+
+  // Drink or Use Bag Item
+  const handleUseBagItem = (item: GameItem) => {
+    if (item.category === 'potion') {
+      const remainingCharges = (item.charges ?? 1) - 1;
+      let healDelta = 0;
+      let toxDelta = item.toxicity ?? 20;
+
+      if (item.name.includes('Swallow')) healDelta = 8;
+      if (item.name.includes('White Raffard')) healDelta = 22;
+
+      let newToxicity = Math.min(100, character.toxicity + toxDelta);
+      if (item.name.includes('White Honey')) {
+        newToxicity = 0;
+      }
+
+      const newHp = Math.min(character.maxHp, character.currentHp + healDelta);
+
+      let updatedInventory = (character.inventory || []).map((i) => {
+        if (i.id === item.id) {
+          return { ...i, charges: remainingCharges };
+        }
+        return i;
+      });
+
+      if (remainingCharges <= 0) {
+        updatedInventory = updatedInventory.filter((i) => i.id !== item.id);
+      }
+
+      onUpdateCharacter({
+        ...character,
+        currentHp: newHp,
+        toxicity: newToxicity,
+        inventory: updatedInventory,
+      });
+
+      onAddLogMessage(`🧪 ${character.name} drank ${item.name}! ${healDelta > 0 ? `Recovered ${healDelta} HP.` : ''} (+${toxDelta} Tox)`, 'combat');
+    }
+  };
 
   // HP Adjustments
   const handleHpChange = (delta: number) => {
@@ -64,7 +227,7 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
     onUpdateCharacter({ ...character, vigor: newVigor });
   };
 
-  // Cast Sign
+  // Cast Sign (Ability SFX silenced per user request)
   const handleCastSign = (signName: WitcherSignName) => {
     const sign = WITCHER_SIGNS[signName];
     if (character.vigor < sign.vigorCost) {
@@ -72,7 +235,6 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
       return;
     }
 
-    playSignSound(signName);
     const newVigor = character.vigor - sign.vigorCost;
     
     // Quen gives temp HP directly
@@ -103,9 +265,8 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
     }
   };
 
-  // Weapon Attack
+  // Weapon Attack (Combat SFX silenced per user request)
   const handleAttack = (isSilver: boolean) => {
-    playSwordClash();
     const weapon = isSilver ? character.silverWeapon : character.steelWeapon;
     onRollDice(`${character.name} strikes with ${weapon.name}`, '1d20', weapon.attackBonus);
     
@@ -116,12 +277,10 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
     }
   };
 
-  // Drink Potion
+  // Drink Potion (SFX silenced per user request)
   const handleDrinkPotion = (potionIndex: number) => {
     const potion = character.potions[potionIndex];
     if (potion.charges <= 0) return;
-
-    playPotionDrink();
     
     if (potion.name === 'White Honey') {
       // Clears toxicity
@@ -322,6 +481,7 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
       <div className="flex flex-wrap border-b border-[#282d33] bg-[#141618] px-4">
         {[
           { id: 'combat', label: 'Combat & Signs', icon: Sword },
+          { id: 'inventory', label: 'Equipment & Bag', icon: Package },
           { id: 'alchemy', label: 'Alchemy & Bombs', icon: FlaskConical },
           { id: 'skills', label: 'Ability Scores & Senses', icon: Activity },
           { id: 'lore', label: 'Roleplay Guide & Backstory', icon: BookOpen },
@@ -544,7 +704,311 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
           </div>
         )}
 
-        {/* TAB 2: ALCHEMY & BOMBS */}
+        {/* TAB 2: INVENTORY & FINITE EQUIPMENT */}
+        {activeSheetTab === 'inventory' && (
+          <div className="space-y-6">
+
+            {/* Wealth & Coin Purse Banner */}
+            <div className="p-4 rounded-xl bg-gradient-to-r from-[#171a1f] to-[#121417] border border-[#c99a45]/50 flex flex-wrap items-center justify-between gap-4 shadow-xl">
+              <div className="flex items-center gap-3.5">
+                <div className="p-3 rounded-xl bg-[#c99a45]/20 border border-[#c99a45]/40 text-[#c99a45] shadow">
+                  <Coins className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl sm:text-2xl font-mono font-bold text-[#e2ba6d]">
+                      🪙 {character.gold || 0}
+                    </span>
+                    <span className="font-cinzel text-xs font-bold text-white uppercase tracking-wider">
+                      Cintrian Orens
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#8a929a] font-cormorant italic">
+                    Finite coin earned through roleplay, secret exploration, inquisitive questions, and monster contracts.
+                  </p>
+                </div>
+              </div>
+
+              {/* Transfer Coin to Party Member */}
+              {onTransferItemOrGold && (
+                <div className="flex items-center gap-2 bg-[#0e1012] p-2 rounded-xl border border-[#2a3038]">
+                  <span className="text-[11px] font-cinzel text-[#8a929a]">Transfer:</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max={character.gold || 0}
+                    value={transferCoinAmount}
+                    onChange={(e) => setTransferCoinAmount(e.target.value)}
+                    className="w-16 bg-[#181a1d] border border-[#343b45] rounded px-2 py-1 text-xs font-mono text-amber-300 focus:outline-none focus:border-[#c99a45]"
+                  />
+                  <select
+                    value={transferTargetSchool}
+                    onChange={(e) => setTransferTargetSchool(e.target.value as WitcherSchool)}
+                    className="bg-[#181a1d] border border-[#343b45] rounded px-2 py-1 text-xs font-cinzel text-white focus:outline-none focus:border-[#c99a45]"
+                  >
+                    {(['Wolf', 'Cat', 'Griffin', 'Bear'] as WitcherSchool[])
+                      .filter((s) => s !== character.school)
+                      .map((s) => (
+                        <option key={s} value={s}>
+                          {s} School
+                        </option>
+                      ))}
+                  </select>
+                  <button
+                    onClick={() => {
+                      const amount = parseInt(transferCoinAmount, 10);
+                      if (amount > 0 && amount <= (character.gold || 0)) {
+                        onTransferItemOrGold(transferTargetSchool, undefined, amount);
+                      }
+                    }}
+                    disabled={(character.gold || 0) < 1}
+                    className="px-2.5 py-1 rounded bg-[#c99a45] hover:bg-[#dfb25d] disabled:opacity-40 text-black font-cinzel font-bold text-xs flex items-center gap-1 transition-colors"
+                  >
+                    <ArrowRightLeft className="w-3 h-3" />
+                    <span>Send</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Currently Equipped Loadout (Complete Armor Set & Dual Swords) */}
+            <div>
+              <h3 className="font-cinzel text-sm font-bold text-white flex items-center gap-2 mb-3">
+                <Shield className="w-4 h-4 text-[#c99a45]" />
+                <span>Active Battle Loadout</span>
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                
+                {/* Active Armor Set */}
+                <div className="p-3.5 rounded-xl bg-[#14171a] border-2 border-sky-500/40 relative">
+                  <div className="flex items-center justify-between text-xs font-cinzel mb-1.5">
+                    <span className="text-sky-400 font-bold flex items-center gap-1">
+                      <Shield className="w-3.5 h-3.5" /> Equipped Armor Set
+                    </span>
+                    <span className="font-mono text-sky-300 font-bold">
+                      AC {character.equippedArmor?.armorClass || character.armorClass}
+                    </span>
+                  </div>
+                  <div className="font-cinzel font-bold text-white text-sm">
+                    {character.equippedArmor?.name || 'Standard Kaer Morhen Witcher Leather'}
+                  </div>
+                  <p className="text-xs text-[#8a929a] font-cormorant italic mt-1">
+                    {character.equippedArmor?.description || 'Reinforced Witcher jerkin with Mahakaman steel rivets.'}
+                  </p>
+                  {character.equippedArmor?.perks && (
+                    <div className="text-[10px] text-sky-300/90 font-mono mt-2 pt-2 border-t border-[#20272f]">
+                      🛡️ {character.equippedArmor.perks.join(' • ')}
+                    </div>
+                  )}
+                </div>
+
+                {/* Active Steel Sword */}
+                <div className="p-3.5 rounded-xl bg-[#14171a] border-2 border-zinc-500/40 relative">
+                  <div className="flex items-center justify-between text-xs font-cinzel mb-1.5">
+                    <span className="text-zinc-300 font-bold flex items-center gap-1">
+                      <Sword className="w-3.5 h-3.5" /> Steel Sword
+                    </span>
+                    <span className="font-mono text-zinc-300 font-bold">
+                      +{character.steelWeapon.attackBonus} to hit
+                    </span>
+                  </div>
+                  <div className="font-cinzel font-bold text-white text-sm truncate">
+                    {character.steelWeapon.name}
+                  </div>
+                  <div className="font-mono text-xs text-rose-400 font-bold mt-0.5">
+                    {character.steelWeapon.damage}
+                  </div>
+                  <p className="text-xs text-[#8a929a] font-cormorant italic mt-1 line-clamp-2">
+                    {character.steelWeapon.description}
+                  </p>
+                  <div className="text-[10px] text-zinc-400 font-mono mt-2 pt-2 border-t border-[#20272f]">
+                    ⚔️ {character.steelWeapon.properties.join(' • ')}
+                  </div>
+                </div>
+
+                {/* Active Silver Sword */}
+                <div className="p-3.5 rounded-xl bg-[#14171a] border-2 border-amber-500/50 relative">
+                  <div className="flex items-center justify-between text-xs font-cinzel mb-1.5">
+                    <span className="text-amber-400 font-bold flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5" /> Silver Sword
+                    </span>
+                    <span className="font-mono text-amber-300 font-bold">
+                      +{character.silverWeapon.attackBonus} to hit
+                    </span>
+                  </div>
+                  <div className="font-cinzel font-bold text-white text-sm truncate">
+                    {character.silverWeapon.name}
+                  </div>
+                  <div className="font-mono text-xs text-amber-300 font-bold mt-0.5">
+                    {character.silverWeapon.damage}
+                  </div>
+                  <p className="text-xs text-[#8a929a] font-cormorant italic mt-1 line-clamp-2">
+                    {character.silverWeapon.description}
+                  </p>
+                  <div className="text-[10px] text-amber-400/90 font-mono mt-2 pt-2 border-t border-[#20272f]">
+                    ✨ {character.silverWeapon.properties.join(' • ')}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* Carried Inventory & Finite Backpack Items */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-cinzel text-sm font-bold text-white flex items-center gap-2">
+                  <Package className="w-4 h-4 text-[#c99a45]" />
+                  <span>Backpack & Carried Loot ({(character.inventory || []).length} Items)</span>
+                </h3>
+                <span className="text-xs text-[#8a929a] font-cormorant italic">
+                  Equip alternative weapons, drink finite potions, or pass gear to party
+                </span>
+              </div>
+
+              {(character.inventory || []).length === 0 ? (
+                <div className="p-6 rounded-xl border border-dashed border-[#282d33] text-center text-xs text-[#717a85] font-cormorant italic">
+                  Your bag is currently empty. Explore areas, interrogate NPCs, and accomplish bounties to receive finite rewards from the Game Master.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {(character.inventory || []).map((item) => {
+                    const isArmor = item.category === 'armor';
+                    const isSteel = item.category === 'steel_sword';
+                    const isSilver = item.category === 'silver_sword';
+                    const isPotion = item.category === 'potion';
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="p-3.5 rounded-xl bg-[#141618] border border-[#262c33] flex flex-col justify-between gap-3 hover:border-[#38414b] transition-colors"
+                      >
+                        <div>
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-cinzel text-xs font-bold text-white">{item.name}</span>
+                                <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${
+                                  item.rarity === 'Relic' ? 'bg-purple-950 text-purple-300 border border-purple-500/40' :
+                                  item.rarity === 'Masterwork' ? 'bg-amber-950 text-amber-300 border border-amber-500/40' :
+                                  'bg-zinc-800 text-zinc-300'
+                                }`}>
+                                  {item.rarity}
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-[#c99a45] font-mono">
+                                🪙 {item.valueGold} Orens
+                              </span>
+                            </div>
+
+                            <span className="text-[9px] font-cinzel px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
+                              {item.category.replace('_', ' ')}
+                            </span>
+                          </div>
+
+                          <p className="text-xs text-[#8a929a] font-cormorant italic mt-1.5">
+                            {item.description}
+                          </p>
+
+                          {/* Stats specifics */}
+                          {item.armorClass && (
+                            <div className="mt-1.5 text-xs text-sky-400 font-mono flex items-center gap-1.5">
+                              <Shield className="w-3.5 h-3.5" />
+                              <span>Armor Class: {item.armorClass} ({item.weightCategory || 'Medium'})</span>
+                            </div>
+                          )}
+
+                          {item.damage && (
+                            <div className="mt-1.5 text-xs text-rose-400 font-mono flex items-center gap-1.5">
+                              <Sword className="w-3.5 h-3.5" />
+                              <span>Damage: {item.damage} {item.isSilver ? '(Silver)' : '(Steel)'}</span>
+                            </div>
+                          )}
+
+                          {item.charges !== undefined && (
+                            <div className="mt-1.5 text-xs text-amber-400 font-mono">
+                              Doses: {item.charges} / {item.maxCharges} remaining
+                            </div>
+                          )}
+
+                          {item.effect && (
+                            <div className="mt-1 text-xs text-emerald-400 font-mono">
+                              ✨ Effect: {item.effect}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Interactive Buttons: Equip, Drink, or Pass to Party Member */}
+                        <div className="pt-2 border-t border-[#20252b] flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-1.5">
+                            {isArmor && (
+                              <button
+                                onClick={() => handleEquipArmor(item)}
+                                className="px-2.5 py-1 rounded bg-sky-950/60 hover:bg-sky-900 border border-sky-600/50 text-sky-300 text-xs font-cinzel font-bold transition-colors"
+                              >
+                                Equip Armor
+                              </button>
+                            )}
+
+                            {isSteel && (
+                              <button
+                                onClick={() => handleEquipSteelSword(item)}
+                                className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-600/50 text-white text-xs font-cinzel font-bold transition-colors"
+                              >
+                                Equip Steel
+                              </button>
+                            )}
+
+                            {isSilver && (
+                              <button
+                                onClick={() => handleEquipSilverSword(item)}
+                                className="px-2.5 py-1 rounded bg-amber-950/60 hover:bg-amber-900 border border-amber-600/50 text-amber-300 text-xs font-cinzel font-bold transition-colors"
+                              >
+                                Equip Silver
+                              </button>
+                            )}
+
+                            {isPotion && (
+                              <button
+                                onClick={() => handleUseBagItem(item)}
+                                disabled={(item.charges ?? 0) <= 0}
+                                className="px-2.5 py-1 rounded bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-600/50 text-emerald-300 disabled:opacity-40 text-xs font-cinzel font-bold transition-colors"
+                              >
+                                Drink Potion
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Pass to Party Member */}
+                          {onTransferItemOrGold && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] text-[#6d7680] font-cinzel">Pass:</span>
+                              {(['Wolf', 'Cat', 'Griffin', 'Bear'] as WitcherSchool[])
+                                .filter((s) => s !== character.school)
+                                .map((s) => (
+                                  <button
+                                    key={s}
+                                    onClick={() => onTransferItemOrGold(s, item.id)}
+                                    className="px-1.5 py-0.5 rounded bg-[#1e2227] hover:bg-[#c99a45] hover:text-black border border-[#2e353f] text-[10px] font-cinzel text-amber-300/80 transition-colors"
+                                    title={`Pass ${item.name} to ${s} School`}
+                                  >
+                                    {s[0]}
+                                  </button>
+                                ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+          </div>
+        )}
+
+        {/* TAB 3: ALCHEMY & BOMBS */}
         {activeSheetTab === 'alchemy' && (
           <div className="space-y-6">
             
