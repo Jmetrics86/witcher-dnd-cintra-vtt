@@ -24,6 +24,7 @@ interface InstructionsModalProps {
   onOpenGuide?: () => void;
   onOpenGMModal?: () => void;
   onOpenNotionModal?: () => void;
+  isHost?: boolean;
 }
 
 export const InstructionsModal: React.FC<InstructionsModalProps> = ({
@@ -34,6 +35,7 @@ export const InstructionsModal: React.FC<InstructionsModalProps> = ({
   onOpenGuide,
   onOpenGMModal,
   onOpenNotionModal,
+  isHost = false,
 }) => {
   const [activeTab, setActiveTab] = useState<'player' | 'gm' | 'combat' | 'p2p'>(defaultTab);
 
@@ -328,7 +330,7 @@ export const InstructionsModal: React.FC<InstructionsModalProps> = ({
                       <span className="w-5 h-5 rounded-full bg-amber-400 text-black text-xs flex items-center justify-center font-mono">4</span>
                       Local Browser Save & Backup
                     </span>
-                    {onOpenGMModal && (
+                    {isHost && onOpenGMModal && (
                       <button
                         type="button"
                         onClick={() => {

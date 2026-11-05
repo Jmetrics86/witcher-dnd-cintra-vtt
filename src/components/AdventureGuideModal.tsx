@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   X,
   Scroll,
@@ -64,7 +64,7 @@ export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
   completedSpotlights = {},
   onToggleSpotlight,
   onSendScriptToChat,
-  isHost: _isHost,
+  isHost = false,
   characters = [],
   actMerchants,
   onBuyMerchantItem,
@@ -83,6 +83,13 @@ export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
   );
   // Temporary purchase alert message
   const [purchaseAlert, setPurchaseAlert] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // Sync shopper school for players (players cannot spend other players' purses)
+  useEffect(() => {
+    if (!isHost && currentShopperSchool) {
+      setSelectedShopperSchool(currentShopperSchool);
+    }
+  }, [isHost, currentShopperSchool]);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const actRefs = useRef<Record<number, HTMLDivElement | null>>({});
@@ -139,7 +146,7 @@ export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
     optionId: string,
     customText?: string
   ) => {
-    if (!onUpdatePartyChoice) return;
+    if (!isHost || !onUpdatePartyChoice) return;
     const existing = partyChoices[choicePoint.id];
     const surpriseText =
       customText !== undefined
@@ -260,7 +267,7 @@ export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
               </h4>
             </div>
 
-            {onShowStoryVisual && (
+            {isHost && onShowStoryVisual && (
               <button
                 type="button"
                 onClick={() => onShowStoryVisual(isCurrentlyShown ? null : visual)}
@@ -335,7 +342,7 @@ export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
                     >
                       School of the {opp.school} • {opp.witcherName}
                     </span>
-                    {onToggleSpotlight && (
+                    {isHost && onToggleSpotlight && (
                       <button
                         type="button"
                         onClick={() => onToggleSpotlight(opp.id)}
@@ -348,6 +355,12 @@ export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         <span>{isDone ? 'Spotlight Done' : 'Mark Used'}</span>
                       </button>
+                    )}
+                    {!isHost && isDone && (
+                      <span className="text-xs font-mono px-2 py-0.5 rounded border bg-emerald-600/20 border-emerald-500/40 text-emerald-300 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>Completed</span>
+                      </span>
                     )}
                   </div>
 
@@ -376,7 +389,7 @@ export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
                   <p className="text-sm text-[#e8e2d5] font-cormorant italic bg-black/40 p-2.5 rounded-lg border border-amber-500/20">
                     &ldquo;{opp.scriptPrompt}&rdquo;
                   </p>
-                  {onSendScriptToChat && (
+                  {isHost && onSendScriptToChat && (
                     <button
                       type="button"
                       onClick={() =>
@@ -414,15 +427,21 @@ export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
           <div>
             <div className="flex items-center gap-2 text-xs font-cinzel font-bold text-amber-400 uppercase tracking-wider">
               <GitBranch className="w-4 h-4" />
-              <span>Interactive DM Choice Tracker • Cause &amp; Effect Engine</span>
+              <span>
+                {isHost ? 'Interactive DM Choice Tracker • Cause & Effect Engine' : 'Campaign Choice • Cause & Effect Record'}
+              </span>
             </div>
             <h4 className="font-cinzel text-lg font-bold text-white mt-0.5">{cp.title}</h4>
           </div>
-          {selectedId && (
+          {selectedId ? (
             <span className="px-2.5 py-1 rounded-full text-xs font-cinzel font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
               <CheckCircle2 className="w-3.5 h-3.5" /> Choice Recorded
             </span>
-          )}
+          ) : !isHost ? (
+            <span className="px-2.5 py-1 rounded-full text-xs font-cinzel text-[#8a929a] bg-[#1a1d21] border border-[#2d343c] flex items-center gap-1">
+              Awaiting GM Decision
+            </span>
+          ) : null}
         </div>
 
         <p className={`${getBodyTextClass()} text-[#e2ba6d] font-semibold`}>{cp.promptQuestion}</p>
@@ -436,11 +455,16 @@ export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
               <button
                 key={opt.id}
                 type="button"
-                onClick={() => handleSelectChoice(cp, opt.id)}
+                disabled={!isHost}
+                onClick={() => {
+                  if (isHost) handleSelectChoice(cp, opt.id);
+                }}
                 className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between gap-2 ${
                   isSelected
                     ? 'bg-amber-950/40 border-[#c99a45] ring-2 ring-[#c99a45]/50 shadow-lg'
-                    : 'bg-[#111316] border-[#2b3138] hover:border-[#c99a45]/50'
+                    : isHost
+                    ? 'bg-[#111316] border-[#2b3138] hover:border-[#c99a45]/50'
+                    : 'bg-[#111316] border-[#22272e] opacity-70 cursor-default'
                 }`}
               >
                 <div>
@@ -468,14 +492,18 @@ export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
           {/* ALWAYS INCLUDE "OTHER (PARTY SURPRISE!)" */}
           <div
             onClick={() => {
-              if (selectedId !== 'other') {
+              if (isHost && selectedId !== 'other') {
                 handleSelectChoice(cp, 'other');
               }
             }}
-            className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-2 ${
+            className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between gap-2 ${
+              isHost ? 'cursor-pointer' : 'cursor-default'
+            } ${
               selectedId === 'other'
                 ? 'bg-purple-950/40 border-purple-400 ring-2 ring-purple-400/50 shadow-lg'
-                : 'bg-[#111316] border-[#2b3138] hover:border-purple-400/50'
+                : isHost
+                ? 'bg-[#111316] border-[#2b3138] hover:border-purple-400/50'
+                : 'bg-[#111316] border-[#22272e] opacity-70'
             }`}
           >
             <div>
@@ -497,13 +525,22 @@ export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
               <textarea
                 rows={2}
                 value={customDraft}
+                disabled={!isHost}
+                readOnly={!isHost}
                 onChange={(e) => {
+                  if (!isHost) return;
                   const val = e.target.value;
                   setCustomSurpriseDrafts((prev) => ({ ...prev, [cp.id]: val }));
                   handleSelectChoice(cp, 'other', val);
                 }}
-                placeholder="Type what the players unexpectedly did & its consequence..."
-                className="w-full bg-black/60 border border-purple-500/40 rounded-lg p-2 text-xs text-white placeholder-[#6c757d] focus:outline-none focus:border-purple-400"
+                placeholder={
+                  isHost
+                    ? 'Type what the players unexpectedly did & its consequence...'
+                    : selectedId === 'other'
+                    ? 'Custom surprise recorded by Game Master'
+                    : 'Surprises are recorded by the Game Master...'
+                }
+                className="w-full bg-black/60 border border-purple-500/40 rounded-lg p-2 text-xs text-white placeholder-[#6c757d] focus:outline-none focus:border-purple-400 disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
           </div>
@@ -651,16 +688,27 @@ export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
               {(['Wolf', 'Cat', 'Griffin', 'Bear'] as WitcherSchool[]).map((school) => {
                 const char = characterList.find((c) => c.school === school);
                 const isSelected = selectedShopperSchool === school;
+                const canSelect = isHost || currentShopperSchool === school;
                 return (
                   <button
                     key={school}
                     type="button"
-                    onClick={() => setSelectedShopperSchool(school)}
+                    disabled={!canSelect}
+                    onClick={() => {
+                      if (canSelect) setSelectedShopperSchool(school);
+                    }}
                     className={`px-2.5 py-1 rounded-lg text-xs font-cinzel flex items-center gap-1.5 transition-all ${
                       isSelected
                         ? 'bg-[#c99a45] text-black font-bold shadow-md shadow-[#c99a45]/20'
-                        : 'bg-[#121416] text-[#a4b0ba] hover:text-white hover:bg-[#20252b] border border-[#272d34]'
+                        : canSelect
+                        ? 'bg-[#121416] text-[#a4b0ba] hover:text-white hover:bg-[#20252b] border border-[#272d34]'
+                        : 'bg-[#101214] text-[#525a62] border border-[#1e2329] opacity-50 cursor-not-allowed'
                     }`}
+                    title={
+                      !canSelect
+                        ? 'Players can only shop with their own Witcher purse'
+                        : `Select ${school} School purse`
+                    }
                   >
                     <span>{school === 'Wolf' ? '🐺' : school === 'Cat' ? '🐱' : school === 'Griffin' ? '🦅' : '🐻'}</span>
                     <span>{school}</span>
@@ -894,7 +942,7 @@ export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
               <Scroll className="w-4 h-4 text-[#c99a45]" />
               <span>DM Read-Aloud Script • Opening Narration (Act {act.act})</span>
             </div>
-            {onSendScriptToChat && (
+            {isHost && onSendScriptToChat && (
               <button
                 type="button"
                 onClick={() => onSendScriptToChat(act.readAloud, `${act.title} — Narration`)}
@@ -937,7 +985,7 @@ export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-mono text-[#8a929a]">{beat.timeMarker}</span>
-                    {onSendScriptToChat && (
+                    {isHost && onSendScriptToChat && (
                       <button
                         type="button"
                         onClick={() => onSendScriptToChat(beat.readAloudScript, beat.title)}
@@ -1215,7 +1263,7 @@ export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
               <Scroll className="w-4 h-4 text-[#c99a45]" />
               <span>DM Read-Aloud Script • Epilogue in Castle Marnadal</span>
             </div>
-            {onSendScriptToChat && (
+            {isHost && onSendScriptToChat && (
               <button
                 type="button"
                 onClick={() => onSendScriptToChat(ep.readAloud, 'Epilogue — Castle Marnadal')}
@@ -1268,8 +1316,8 @@ export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
 
           {/* Right Controls: Script Font Size, Scroll Mode, Active Visual Indicator, Close */}
           <div className="flex flex-wrap items-center gap-2">
-            {/* Active Story Visual Banner Reset */}
-            {activeStoryVisual && onShowStoryVisual && (
+            {/* Active Story Visual Banner Reset (Host Only) */}
+            {isHost && activeStoryVisual && onShowStoryVisual && (
               <button
                 type="button"
                 onClick={() => onShowStoryVisual(null)}

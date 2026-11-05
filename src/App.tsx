@@ -37,6 +37,20 @@ import { MAP_SCENES } from './data/maps';
 import { p2pManager, ConnectedPeerInfo } from './services/peerService';
 import { playCriticalHitSound } from './utils/audio';
 
+const WITCHER_SCHOOLS: WitcherSchool[] = ['Wolf', 'Cat', 'Griffin', 'Bear'];
+
+// Resolves which Witcher a connected peer *actually* holds, based only on the GM-approved
+// assignment table (never on anything the peer claims in a packet).
+const getClaimedWitcher = (
+  assignments: Record<string, CharacterAssignment>,
+  peerId: string
+): WitcherCharacter | undefined => {
+  const assignment = Object.values(assignments).find(
+    (a) => a.isLocked && a.claimedByPeerId === peerId
+  );
+  return assignment ? PREGEN_WITCHERS.find((w) => w.id === assignment.characterId) : undefined;
+};
+
 const getDefaultTokens = (): MapToken[] => [
   {
     id: 'token-wolf',
@@ -154,6 +168,10 @@ export const App: React.FC = () => {
   const [isRoomLocked, setIsRoomLocked] = useState(false);
   const [statusText, setStatusText] = useState('P2P Standby (Offline Ready)');
   const [initialRoomFromUrl, setInitialRoomFromUrl] = useState<string | undefined>(undefined);
+
+  // GM-level authority: the hosting Game Master, or anyone running a purely local (offline)
+  // session. A player connected to someone else's room NEVER has this, regardless of UI state.
+  const hasGmControls = isHost || !isConnected;
 
   // Detect ?room= invite link parameter on load
   useEffect(() => {
@@ -279,6 +297,251 @@ export const App: React.FC = () => {
     });
   }, [currentScene, tokens, messages, selectedCharacter, partyCharacters, economyState, characterAssignments, activeStoryVisual, partyChoices, completedSpotlights]);
 
+  // ───────────────────────── Host-authoritative helpers ─────────────────────────
+  // These read live state from gameStateRef so they are safe to call from the memoized P2P
+  // handler. Only the Game Master's client ever executes them for networked play.
+
+  // Chronicle entry authored by the host itself (never attributed to a player's character).
+  const postHostLog = (text: string, type: ChatMessage['type'] = 'system') => {
+    const msg: ChatMessage = {
+      id: `host-log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      senderId: 'system',
+      senderName: 'Chronicle of Cintra',
+      type,
+      text,
+      timestamp: Date.now(),
+    };
+    setMessages((prev) => [...prev, msg]);
+    p2pManager.send({
+      type: 'CHAT_MESSAGE',
+      senderId: 'gm',
+      senderName: 'Game Master',
+      payload: msg,
+      timestamp: Date.now(),
+    });
+  };
+
+  // Push the authoritative economy + party sheets to every player.
+  const broadcastAuthoritativeParty = () => {
+    const st = gameStateRef.current;
+    p2pManager.send({
+      type: 'ECONOMY_SYNC',
+      senderId: 'gm',
+      senderName: 'Game Master',
+      payload: { economyState: st.economyState, partyCharacters: st.partyCharacters },
+      timestamp: Date.now(),
+    });
+  };
+
+  // Executes a merchant purchase. The host looks up price, stock and item itself; the buyer's
+  // purse is checked against the host's copy of their sheet. Returns true if the sale went through.
+  const applyMerchantPurchase = (
+    buyerSchool: WitcherSchool,
+    actNum: number,
+    itemId: string,
+    requireActiveAct: boolean
+  ): boolean => {
+    const st = gameStateRef.current;
+    // Players can only trade with the merchant of the act the GM currently has in play.
+    if (requireActiveAct && st.currentScene.actNumber !== actNum) return false;
+
+    const merchants = st.economyState.actMerchants || DEFAULT_ACT_MERCHANTS;
+    const merchant = merchants[actNum];
+    const mItem = merchant?.items.find((i) => i.id === itemId);
+    const buyer = st.partyCharacters[buyerSchool] || PREGEN_WITCHERS.find((w) => w.school === buyerSchool);
+    if (!merchant || !mItem || !buyer) return false;
+    if (mItem.stock <= 0 || buyer.gold < mItem.priceGold) return false;
+
+    const boughtItem: GameItem = {
+      ...mItem.item,
+      assignedToSchool: buyerSchool,
+      assignedToName: buyer.name,
+      equipped: false,
+      discoverySource: `Purchased from ${merchant.name} in Act ${actNum}`,
+    };
+
+    // Consumables also go into the quick-use lists on the character sheet
+    const newPotions = [...buyer.potions];
+    if (boughtItem.category === 'potion') {
+      newPotions.push({
+        name: boughtItem.name.replace(/ \(Phial #\d+\)/, ''),
+        toxicity: boughtItem.toxicity || 20,
+        charges: boughtItem.charges || 2,
+        maxCharges: boughtItem.maxCharges || 2,
+        duration: boughtItem.duration || '1 minute',
+        effect: boughtItem.effect || boughtItem.description,
+      });
+    }
+    const newBombs = [...buyer.bombs];
+    if (boughtItem.category === 'bomb') {
+      newBombs.push({
+        name: boughtItem.name.replace(/ \(Pack #\d+\)/, ''),
+        count: boughtItem.charges || 2,
+        maxCount: boughtItem.maxCharges || 2,
+        radius: '15 ft sphere',
+        effect: boughtItem.effect || boughtItem.description,
+      });
+    }
+    const newOils = [...buyer.oils];
+    if (boughtItem.category === 'oil') {
+      newOils.push({
+        name: boughtItem.name,
+        targetCategory: boughtItem.effect?.includes('Relict') ? 'Relicts (Leshen, Chort)' :
+                        boughtItem.effect?.includes('Specter') ? 'Specters & Hounds' :
+                        boughtItem.effect?.includes('Necrophage') ? 'Necrophages (Grave Hag)' : 'Monsters',
+        bonusDamage: '+1d8 damage',
+        charges: boughtItem.charges || 10,
+        maxCharges: boughtItem.maxCharges || 10,
+      });
+    }
+
+    const updatedBuyer: WitcherCharacter = {
+      ...buyer,
+      gold: buyer.gold - mItem.priceGold,
+      inventory: [...(buyer.inventory || []), boughtItem],
+      potions: newPotions,
+      bombs: newBombs,
+      oils: newOils,
+    };
+
+    const updatedMerchants = {
+      ...merchants,
+      [actNum]: {
+        ...merchant,
+        items: merchant.items.map((it) => (it.id === itemId ? { ...it, stock: it.stock - 1 } : it)),
+      },
+    };
+
+    const newEconomy: CampaignEconomyState = {
+      ...st.economyState,
+      dmVaultGold: st.economyState.dmVaultGold + mItem.priceGold,
+      rewardLog: [
+        ...st.economyState.rewardLog,
+        {
+          id: `shop-${Date.now()}`,
+          timestamp: Date.now(),
+          recipientSchool: buyerSchool,
+          recipientName: buyer.name,
+          type: 'item_grant',
+          amountGold: -mItem.priceGold,
+          itemName: boughtItem.name,
+          note: `Purchased from ${merchant.name} in Act ${actNum} for ${mItem.priceGold} Orens.`,
+        },
+      ],
+      actMerchants: updatedMerchants,
+    };
+    const newParty = { ...st.partyCharacters, [buyerSchool]: updatedBuyer };
+
+    // Update the ref immediately so back-to-back requests see the new stock / purse
+    gameStateRef.current = { ...st, economyState: newEconomy, partyCharacters: newParty };
+    setEconomyState(newEconomy);
+    setPartyCharacters(newParty);
+    setSelectedCharacter((prev) =>
+      prev.school === buyerSchool ? { ...updatedBuyer, currentHp: prev.currentHp } : prev
+    );
+
+    postHostLog(
+      `🪙 [Waystation Outfitter] ${merchant.name} sold ${boughtItem.name} to ${buyer.name} for ${mItem.priceGold} Cintrian Orens. (${mItem.stock - 1} left in stock)`,
+      'lore'
+    );
+    broadcastAuthoritativeParty();
+    return true;
+  };
+
+  // Host-side authorization of every packet a connected client sends. This is the real access
+  // control: the UI hides GM tools from players, but nothing a modified client sends can get past
+  // here. Identity (senderId/senderName) has already been overwritten by the transport layer
+  // with the verified peer, so it cannot be spoofed.
+  const guardClientPacket = useCallback(
+    (packet: P2PPacket, peer: ConnectedPeerInfo): P2PPacket | null => {
+      const st = gameStateRef.current;
+      if (!st.isHost) return null;
+
+      const ownChar = getClaimedWitcher(st.characterAssignments, peer.peerId);
+      const displayName = ownChar?.name || peer.playerName;
+
+      // Re-stamp chat/roll messages: no GM voice, no borrowed names, only sane message types.
+      const stampMessage = (p: P2PPacket, forceOoc: boolean): P2PPacket => {
+        const original = (p.payload || {}) as Record<string, any>;
+        const allowedTypes = ['chat', 'roll', 'combat', 'system'];
+        const payload: Record<string, any> = {
+          ...original,
+          senderId: peer.peerId,
+          senderName: displayName,
+          school: ownChar?.school,
+          isDM: false,
+          type: allowedTypes.includes(original.type) ? original.type : 'chat',
+        };
+        if (forceOoc) {
+          payload.speechMode = 'ooc';
+          payload.type = 'chat';
+        } else if (payload.speechMode === 'dm') {
+          payload.speechMode = 'ic';
+        }
+        if (original.rollData && typeof original.rollData === 'object') {
+          payload.rollData = {
+            ...original.rollData,
+            senderId: peer.peerId,
+            senderName: displayName,
+            school: ownChar?.school,
+          };
+        }
+        return { ...p, senderName: displayName, payload };
+      };
+
+      // Observers are read-only spectators: out-of-character chat and nothing else.
+      if (peer.isObserver) {
+        return packet.type === 'CHAT_MESSAGE' ? stampMessage(packet, true) : null;
+      }
+
+      switch (packet.type) {
+        case 'CHAT_MESSAGE':
+          return stampMessage(packet, false);
+
+        case 'DICE_ROLL':
+          return ownChar ? stampMessage(packet, false) : null;
+
+        case 'PING_COORDINATE':
+          return packet;
+
+        case 'TOKEN_MOVE': {
+          // A player may move exactly one token: the Witcher the GM assigned to them.
+          if (!ownChar) return null;
+          const token = st.tokens.find((t) => t.id === packet.payload?.tokenId);
+          if (!token || token.isMonster) return null;
+          return token.school === ownChar.school ? packet : null;
+        }
+
+        case 'CHARACTER_CLAIM':
+          // Adjudicated by the CHARACTER_CLAIM handler (one per player, one per school)
+          return packet;
+
+        case 'CHARACTER_UPDATE':
+        case 'MERCHANT_PURCHASE':
+          // Only seated players; the handlers re-derive who the player is from the assignment table
+          return ownChar ? packet : null;
+
+        default:
+          // Anything else (map, tokens, story, economy, assignments, state sync...) is GM-only
+          return null;
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    p2pManager.setPacketGuard(guardClientPacket);
+    return () => p2pManager.setPacketGuard(null);
+  }, [guardClientPacket]);
+
+  // Keep the roster's "school" column honest: derived from GM-approved assignments only.
+  useEffect(() => {
+    if (!isHost) return;
+    connectedPeers.forEach((peer) => {
+      p2pManager.setPeerSchool(peer.peerId, getClaimedWitcher(characterAssignments, peer.peerId)?.school);
+    });
+  }, [isHost, characterAssignments, connectedPeers]);
+
   // Handle incoming P2P Packet
   const handleP2PPacket = useCallback((packet: P2PPacket) => {
     switch (packet.type) {
@@ -291,20 +554,10 @@ export const App: React.FC = () => {
         break;
 
       case 'TOKEN_MOVE': {
-        const { tokenId, x, y, isHostMove, senderSchool } = packet.payload;
-        setTokens((prev) => {
-          const targetToken = prev.find((t) => t.id === tokenId);
-          if (!targetToken) return prev;
-          // Non-host players can ONLY move their own character
-          if (packet.senderId !== 'gm' && !isHostMove) {
-            const isOwner = (targetToken.school && targetToken.school === senderSchool) ||
-                            targetToken.name === packet.senderName;
-            if (!isOwner) {
-              return prev; // Reject unauthorized move
-            }
-          }
-          return prev.map((t) => (t.id === tokenId ? { ...t, x, y } : t));
-        });
+        // Ownership was already enforced by the host guard (players) or is the GM's own move;
+        // clients only ever receive moves relayed by the host, so apply them as-is.
+        const { tokenId, x, y } = packet.payload;
+        setTokens((prev) => prev.map((t) => (t.id === tokenId ? { ...t, x, y } : t)));
         break;
       }
 
@@ -404,7 +657,10 @@ export const App: React.FC = () => {
           );
           if (myAssignment) {
             const found = PREGEN_WITCHERS.find((w) => w.id === myAssignment.characterId);
-            if (found) setSelectedCharacter(found);
+            if (found) {
+              const livePartySheet = (packet.payload.partyCharacters as Record<string, WitcherCharacter> | undefined)?.[found.school];
+              setSelectedCharacter(livePartySheet || found);
+            }
           } else if (p2pManager.isObserver) {
             handleAddLogMessage(
               'Party is full (4 Players active). You are connected as an Observer (Spectating).',
@@ -420,67 +676,66 @@ export const App: React.FC = () => {
         break;
 
       case 'CHARACTER_CLAIM': {
-        if (gameStateRef.current.isHost) {
-          const { characterId, playerName } = packet.payload;
-          const existing = gameStateRef.current.characterAssignments[characterId];
-          const targetWitcher = PREGEN_WITCHERS.find((w) => w.id === characterId);
+        const st = gameStateRef.current;
+        if (!st.isHost) break;
 
-          if (existing && existing.isLocked && existing.claimedByPeerId !== packet.senderId) {
-            // Already claimed by someone else
-            p2pManager.send({
-              type: 'CHAT_MESSAGE',
-              senderId: 'system',
-              senderName: 'Chronicle of Cintra',
-              payload: {
-                id: `claim-denied-${Date.now()}`,
-                senderId: 'system',
-                senderName: 'System',
-                type: 'system',
-                text: `School of the ${targetWitcher?.school || 'Witcher'} is already claimed by ${existing.claimedByName}! Please select an available School.`,
-                timestamp: Date.now(),
-              },
-              timestamp: Date.now(),
-            });
-            return;
-          }
+        // packet.senderId is the transport-verified peer id, not something the client chose
+        const peerId = packet.senderId;
+        const peerInfo = p2pManager.getConnectedPeers().find((p) => p.peerId === peerId);
+        const characterId = String(packet.payload?.characterId || '');
+        const targetWitcher = PREGEN_WITCHERS.find((w) => w.id === characterId);
+        const existing = st.characterAssignments[characterId];
 
-          // Approve and update assignment
-          const updated: Record<string, CharacterAssignment> = {
-            ...gameStateRef.current.characterAssignments,
-            [characterId]: {
-              characterId,
-              claimedByPeerId: packet.senderId,
-              claimedByName: playerName || packet.senderName,
-              isLocked: true,
-              claimedAt: Date.now(),
-            },
-          };
-
-          setCharacterAssignments(updated);
-
-          // Broadcast authoritative assignments to all connected players
+        // Reject and force the requester's UI back to the authoritative table
+        const deny = (reason?: string) => {
           p2pManager.send({
             type: 'CHARACTER_ASSIGNMENT_SYNC',
             senderId: 'gm',
             senderName: 'Game Master',
-            payload: updated,
+            payload: st.characterAssignments,
             timestamp: Date.now(),
           });
+          if (reason) postHostLog(reason);
+        };
 
-          // Announce in chat log
-          const claimNotice = `⚔️ ${playerName || packet.senderName} has locked in ${targetWitcher?.name} (School of the ${targetWitcher?.school})!`;
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `claim-${Date.now()}`,
-              senderId: 'system',
-              senderName: 'Chronicle of Cintra',
-              type: 'system',
-              text: claimNotice,
-              timestamp: Date.now(),
-            },
-          ]);
+        if (!peerInfo || peerInfo.isObserver || !targetWitcher) {
+          deny();
+          break;
         }
+        // One Witcher per player: once locked, only the GM can move them
+        if (getClaimedWitcher(st.characterAssignments, peerId)) {
+          deny(`${peerInfo.playerName} is already locked into a Witcher. Only the Game Master can reassign characters.`);
+          break;
+        }
+        // One player per Witcher
+        if (existing && existing.isLocked) {
+          deny(`School of the ${targetWitcher.school} is already claimed by ${existing.claimedByName}! Please select an available School.`);
+          break;
+        }
+
+        const updated: Record<string, CharacterAssignment> = {
+          ...st.characterAssignments,
+          [characterId]: {
+            characterId,
+            claimedByPeerId: peerId,
+            claimedByName: peerInfo.playerName,
+            isLocked: true,
+            claimedAt: Date.now(),
+          },
+        };
+        gameStateRef.current = { ...st, characterAssignments: updated };
+        setCharacterAssignments(updated);
+
+        // Broadcast authoritative assignments to all connected players
+        p2pManager.send({
+          type: 'CHARACTER_ASSIGNMENT_SYNC',
+          senderId: 'gm',
+          senderName: 'Game Master',
+          payload: updated,
+          timestamp: Date.now(),
+        });
+
+        postHostLog(`⚔️ ${peerInfo.playerName} has locked in ${targetWitcher.name} (School of the ${targetWitcher.school})!`);
         break;
       }
 
@@ -488,16 +743,16 @@ export const App: React.FC = () => {
         const assignments = packet.payload as Record<string, CharacterAssignment>;
         setCharacterAssignments(assignments);
 
-        // If I was assigned a character, update my selected Witcher
+        // If I was assigned a character, update my selected Witcher (match on verified peer id only)
         const myAssignment = Object.values(assignments).find(
-          (a) =>
-            a.claimedByPeerId === p2pManager.myPeerId ||
-            (!gameStateRef.current.isHost && a.claimedByName === gameStateRef.current.selectedCharacter.name)
+          (a) => a.isLocked && a.claimedByPeerId === p2pManager.myPeerId
         );
         if (myAssignment) {
           const found = PREGEN_WITCHERS.find((w) => w.id === myAssignment.characterId);
           if (found && found.id !== gameStateRef.current.selectedCharacter.id) {
-            setSelectedCharacter(found);
+            // Use the live party sheet (current gold/inventory), not the pristine pregen
+            const live = gameStateRef.current.partyCharacters[found.school] || found;
+            setSelectedCharacter(live);
             setMessages((prev) => [
               ...prev,
               {
@@ -534,11 +789,18 @@ export const App: React.FC = () => {
         break;
 
       case 'ECONOMY_SYNC': {
+        // Host -> players only (the validator rejects this type from clients)
         if (packet.payload.economyState) {
           setEconomyState(packet.payload.economyState);
         }
         if (packet.payload.partyCharacters) {
-          setPartyCharacters(packet.payload.partyCharacters);
+          const party = packet.payload.partyCharacters as Record<string, WitcherCharacter>;
+          setPartyCharacters(party);
+          // Refresh my own sheet from the authoritative copy (keep my live HP)
+          const mine = party[gameStateRef.current.selectedCharacter.school];
+          if (mine) {
+            setSelectedCharacter((prev) => ({ ...mine, currentHp: prev.currentHp }));
+          }
         } else if (packet.payload.updatedSchool) {
           const school = packet.payload.updatedSchool as WitcherSchool;
           setPartyCharacters((prev) => {
@@ -554,48 +816,141 @@ export const App: React.FC = () => {
             }
             return { ...prev, [school]: updated };
           });
+        } else if (packet.payload.reclaimedItemId) {
+          const reclaimedId = packet.payload.reclaimedItemId as string;
+          setPartyCharacters((prev) => {
+            const next: Record<string, WitcherCharacter> = {};
+            Object.entries(prev).forEach(([school, ch]) => {
+              next[school] = { ...ch, inventory: (ch.inventory || []).filter((i) => i.id !== reclaimedId) };
+            });
+            return next;
+          });
+          setSelectedCharacter((prev) => ({
+            ...prev,
+            inventory: (prev.inventory || []).filter((i) => i.id !== reclaimedId),
+          }));
         }
         break;
       }
 
       case 'MERCHANT_PURCHASE': {
-        if (packet.payload) {
-          if (packet.payload.economyState) {
-            setEconomyState(packet.payload.economyState);
-          }
-          if (packet.payload.partyCharacters) {
-            setPartyCharacters(packet.payload.partyCharacters);
-          }
-          if (packet.payload.updatedCharacter && packet.payload.buyerSchool) {
-            const school = packet.payload.buyerSchool as WitcherSchool;
-            setPartyCharacters((prev) => ({
-              ...prev,
-              [school]: packet.payload.updatedCharacter,
-            }));
-            if (gameStateRef.current.selectedCharacter.school === school) {
-              setSelectedCharacter(packet.payload.updatedCharacter);
-            }
-          }
-          if (packet.payload.logText) {
-            handleAddLogMessage(packet.payload.logText, 'lore');
-          }
-        }
+        // Purchase REQUEST from a player (host only). The buyer is always the sender's own
+        // Witcher as recorded in the GM's assignment table; payload.buyerSchool is ignored, and
+        // price / stock / item come from the host's own merchant data.
+        const st = gameStateRef.current;
+        if (!st.isHost) break;
+        const owner = getClaimedWitcher(st.characterAssignments, packet.senderId);
+        if (!owner) break;
+        const { actNum, itemId } = packet.payload;
+        applyMerchantPurchase(owner.school, actNum, itemId, true);
         break;
       }
 
       case 'CHARACTER_UPDATE': {
-        if (packet.payload.updatedFrom && packet.payload.updatedTo) {
-          const { updatedFrom, updatedTo } = packet.payload;
+        const st = gameStateRef.current;
+        const payload = packet.payload || {};
+
+        if (st.isHost) {
+          // REQUEST from a player. Never copy their numbers in; derive everything from the
+          // host's own copy of the party and apply only what that player is entitled to do.
+          const owner = getClaimedWitcher(st.characterAssignments, packet.senderId);
+          if (!owner) break;
+
+          // (a) Report HP change on their own Witcher
+          if (payload.selfUpdate) {
+            const requested = Math.round(Number(payload.selfUpdate.currentHp));
+            if (!Number.isFinite(requested)) break;
+            const myToken = st.tokens.find((t) => t.school === owner.school);
+            const maxHp = myToken?.maxHp ?? owner.maxHp;
+            const hp = Math.max(0, Math.min(maxHp, requested));
+            const newTokens = st.tokens.map((t) => (t.school === owner.school ? { ...t, currentHp: hp } : t));
+            const ownerSheet = st.partyCharacters[owner.school];
+            const newParty = ownerSheet
+              ? { ...st.partyCharacters, [owner.school]: { ...ownerSheet, currentHp: hp } }
+              : st.partyCharacters;
+            gameStateRef.current = { ...st, tokens: newTokens, partyCharacters: newParty };
+            setTokens(newTokens);
+            setPartyCharacters(newParty);
+            setSelectedCharacter((prev) => (prev.school === owner.school ? { ...prev, currentHp: hp } : prev));
+            p2pManager.send({
+              type: 'SYNC_STATE',
+              senderId: 'gm',
+              senderName: 'Game Master',
+              payload: { tokens: newTokens },
+              timestamp: Date.now(),
+            });
+            break;
+          }
+
+          // (b) Give gold / an item from their own pack to another Witcher
+          if (payload.transferRequest) {
+            const toSchool = String(payload.transferRequest.toSchool) as WitcherSchool;
+            if (!WITCHER_SCHOOLS.includes(toSchool) || toSchool === owner.school) break;
+            const from = st.partyCharacters[owner.school];
+            const to = st.partyCharacters[toSchool];
+            if (!from || !to) break;
+
+            const requestedGold = Math.floor(Number(payload.transferRequest.goldAmount) || 0);
+            const goldMoved = Math.max(0, Math.min(from.gold || 0, requestedGold));
+            const itemId = payload.transferRequest.itemId ? String(payload.transferRequest.itemId) : '';
+            const item = itemId ? (from.inventory || []).find((i) => i.id === itemId) : undefined;
+            if (goldMoved <= 0 && !item) break;
+
+            const updatedFrom: WitcherCharacter = {
+              ...from,
+              gold: (from.gold || 0) - goldMoved,
+              inventory: item ? (from.inventory || []).filter((i) => i.id !== item.id) : from.inventory,
+            };
+            const updatedTo: WitcherCharacter = {
+              ...to,
+              gold: (to.gold || 0) + goldMoved,
+              inventory: item
+                ? [...(to.inventory || []), { ...item, assignedToSchool: toSchool, equipped: false }]
+                : to.inventory,
+            };
+            const newParty = { ...st.partyCharacters, [owner.school]: updatedFrom, [toSchool]: updatedTo };
+            gameStateRef.current = { ...st, partyCharacters: newParty };
+            setPartyCharacters(newParty);
+            setSelectedCharacter((prev) =>
+              prev.school === owner.school
+                ? { ...updatedFrom, currentHp: prev.currentHp }
+                : prev.school === toSchool
+                ? { ...updatedTo, currentHp: prev.currentHp }
+                : prev
+            );
+
+            const details = [
+              goldMoved > 0 ? `🪙 ${goldMoved} Orens` : '',
+              item ? `📦 ${item.name}` : '',
+            ].filter(Boolean).join(' and ');
+            postHostLog(`🤝 ${from.name} gave ${details} to ${to.name}.`, 'chat');
+
+            p2pManager.send({
+              type: 'CHARACTER_UPDATE',
+              senderId: 'gm',
+              senderName: 'Game Master',
+              payload: { updatedFrom, updatedTo },
+              timestamp: Date.now(),
+            });
+          }
+          break;
+        }
+
+        // Player client: apply the host's authoritative result
+        if (payload.updatedFrom && payload.updatedTo) {
+          const { updatedFrom, updatedTo } = payload;
           setPartyCharacters((prev) => ({
             ...prev,
             [updatedFrom.school]: updatedFrom,
             [updatedTo.school]: updatedTo,
           }));
-          if (gameStateRef.current.selectedCharacter.school === updatedFrom.school) {
-            setSelectedCharacter(updatedFrom);
-          } else if (gameStateRef.current.selectedCharacter.school === updatedTo.school) {
-            setSelectedCharacter(updatedTo);
-          }
+          setSelectedCharacter((prev) =>
+            prev.school === updatedFrom.school
+              ? { ...updatedFrom, currentHp: prev.currentHp }
+              : prev.school === updatedTo.school
+              ? { ...updatedTo, currentHp: prev.currentHp }
+              : prev
+          );
         }
         break;
       }
@@ -752,11 +1107,13 @@ export const App: React.FC = () => {
 
   // Kick Peer (Host Only)
   const handleKickPeer = (peerId: string) => {
+    if (!isHost) return;
     p2pManager.kickPeer(peerId);
   };
 
   // Toggle Room Lock (Host Only)
   const handleToggleRoomLock = (locked: boolean) => {
+    if (!isHost) return;
     p2pManager.setRoomLocked(locked);
     setIsRoomLocked(locked);
   };
@@ -944,6 +1301,7 @@ export const App: React.FC = () => {
 
   // Add Monster Token (Host GM tool)
   const handleTokenAdd = (token: MapToken) => {
+    if (!hasGmControls) return;
     setTokens((prev) => [...prev, token]);
 
     p2pManager.send({
@@ -959,6 +1317,7 @@ export const App: React.FC = () => {
 
   // Remove Token
   const handleTokenRemove = (tokenId: string) => {
+    if (!hasGmControls) return;
     setTokens((prev) => prev.filter((t) => t.id !== tokenId));
 
     p2pManager.send({
@@ -972,6 +1331,7 @@ export const App: React.FC = () => {
 
   // Update Token (e.g. HP change from spawner drawer)
   const handleTokenUpdate = (updatedToken: MapToken) => {
+    if (!hasGmControls) return;
     setTokens((prev) => prev.map((t) => (t.id === updatedToken.id ? updatedToken : t)));
 
     // If updated token is a Witcher, sync to character sheet!
@@ -995,96 +1355,86 @@ export const App: React.FC = () => {
     });
   };
 
-  // Adjust Token HP by Delta (+/-) — Linked directly to Character Sheets!
-  const handleTokenHpChange = (tokenId: string, delta: number) => {
-    let updatedName = '';
-    let newHp = 0;
-    let maxHp = 0;
-    let tokenSchool: WitcherSchool | undefined = undefined;
-
-    setTokens((prev) =>
-      prev.map((t) => {
-        if (t.id === tokenId) {
-          const calcHp = Math.max(0, Math.min(t.maxHp, (t.currentHp ?? t.maxHp) + delta));
-          updatedName = t.name;
-          newHp = calcHp;
-          maxHp = t.maxHp;
-          tokenSchool = t.school;
-          return { ...t, currentHp: calcHp };
-        }
-        return t;
-      })
+  // Who may change a token's HP: the GM for any token; a seated player only for the token of
+  // their own Witcher (to report damage taken / healing). Never for monsters, NPCs or other players.
+  const canEditTokenHp = (token: MapToken | undefined): boolean => {
+    if (!token) return false;
+    if (hasGmControls) return true;
+    return (
+      !isObserver &&
+      isCurrentCharacterLocked &&
+      Boolean(token.school) &&
+      token.school === selectedCharacter.school
     );
+  };
 
-    // LINK TO CHARACTER SHEET: If this token is a Witcher character, update the sheet immediately!
-    if (tokenSchool || selectedCharacter.name === updatedName) {
-      setSelectedCharacter((prev) => {
-        if (prev.school === tokenSchool || prev.name === updatedName) {
-          return { ...prev, currentHp: newHp };
-        }
-        return prev;
+  // Shared HP commit: validates permission, clamps, links the Character Sheet, then syncs.
+  // GM -> broadcasts the token state. Player -> sends a self-report the host validates & rebroadcasts.
+  const commitTokenHp = (
+    tokenId: string,
+    resolveHp: (current: number, max: number) => number,
+    describe: (name: string, newHp: number, maxHp: number, delta: number) => string
+  ) => {
+    const target = tokens.find((t) => t.id === tokenId);
+    if (!target || !canEditTokenHp(target)) {
+      if (target) handleAddLogMessage('⚠️ You can only adjust the health of your own Witcher.', 'system');
+      return;
+    }
+    const current = target.currentHp ?? target.maxHp;
+    const newHp = Math.max(0, Math.min(target.maxHp, resolveHp(current, target.maxHp)));
+    const delta = newHp - current;
+    const newTokens = tokens.map((t) => (t.id === tokenId ? { ...t, currentHp: newHp } : t));
+    setTokens(newTokens);
+
+    // LINK TO CHARACTER SHEET: a Witcher's token and sheet always share the same HP
+    if (target.school) {
+      const school = target.school;
+      setSelectedCharacter((prev) => (prev.school === school ? { ...prev, currentHp: newHp } : prev));
+      setPartyCharacters((prev) =>
+        prev[school] ? { ...prev, [school]: { ...prev[school], currentHp: newHp } } : prev
+      );
+    }
+
+    handleAddLogMessage(describe(target.name, newHp, target.maxHp, delta), 'combat');
+
+    if (hasGmControls) {
+      p2pManager.send({
+        type: 'SYNC_STATE',
+        senderId: 'gm',
+        senderName: 'Game Master',
+        payload: { tokens: newTokens },
+        timestamp: Date.now(),
+      });
+    } else {
+      p2pManager.send({
+        type: 'CHARACTER_UPDATE',
+        senderId: p2pManager.myPeerId,
+        senderName: selectedCharacter.name,
+        payload: { selfUpdate: { currentHp: newHp } },
+        timestamp: Date.now(),
       });
     }
+  };
 
-    if (delta < 0) {
-      handleAddLogMessage(`⚔️ ${updatedName} took ${Math.abs(delta)} damage! (${newHp}/${maxHp} HP)`, 'combat');
-    } else {
-      handleAddLogMessage(`💚 ${updatedName} recovered ${delta} HP! (${newHp}/${maxHp} HP)`, 'combat');
-    }
-
-    p2pManager.send({
-      type: 'SYNC_STATE',
-      senderId: 'gm',
-      senderName: 'Game Master',
-      payload: {
-        tokens: tokens.map((t) => (t.id === tokenId ? { ...t, currentHp: newHp } : t)),
-      },
-      timestamp: Date.now(),
-    });
+  // Adjust Token HP by Delta (+/-) — Linked directly to Character Sheets!
+  const handleTokenHpChange = (tokenId: string, delta: number) => {
+    commitTokenHp(
+      tokenId,
+      (current) => current + delta,
+      (name, newHp, maxHp, applied) =>
+        applied < 0
+          ? `⚔️ ${name} took ${Math.abs(applied)} damage! (${newHp}/${maxHp} HP)`
+          : `💚 ${name} recovered ${applied} HP! (${newHp}/${maxHp} HP)`
+    );
   };
 
   // Set Absolute Token HP (e.g. Full Heal, 0 HP down) — Linked to Character Sheets!
   const handleSetTokenHp = (tokenId: string, targetHp: number) => {
-    let updatedName = '';
-    let newHp = 0;
-    let maxHp = 0;
-    let tokenSchool: WitcherSchool | undefined = undefined;
-
-    setTokens((prev) =>
-      prev.map((t) => {
-        if (t.id === tokenId) {
-          const calcHp = Math.max(0, Math.min(t.maxHp, targetHp));
-          updatedName = t.name;
-          newHp = calcHp;
-          maxHp = t.maxHp;
-          tokenSchool = t.school;
-          return { ...t, currentHp: calcHp };
-        }
-        return t;
-      })
+    commitTokenHp(
+      tokenId,
+      () => targetHp,
+      (name, newHp, maxHp) => `💚 ${name} HP set to ${newHp}/${maxHp} HP.`
     );
-
-    // LINK TO CHARACTER SHEET:
-    if (tokenSchool || selectedCharacter.name === updatedName) {
-      setSelectedCharacter((prev) => {
-        if (prev.school === tokenSchool || prev.name === updatedName) {
-          return { ...prev, currentHp: newHp };
-        }
-        return prev;
-      });
-    }
-
-    handleAddLogMessage(`💚 ${updatedName} HP set to ${newHp}/${maxHp} HP.`, 'combat');
-
-    p2pManager.send({
-      type: 'SYNC_STATE',
-      senderId: 'gm',
-      senderName: 'Game Master',
-      payload: {
-        tokens: tokens.map((t) => (t.id === tokenId ? { ...t, currentHp: newHp } : t)),
-      },
-      timestamp: Date.now(),
-    });
   };
 
   // Open Character Sheet for a specific Witcher School directly from Map Token
@@ -1123,19 +1473,30 @@ export const App: React.FC = () => {
       })
     );
 
-    p2pManager.send({
-      type: 'SYNC_STATE',
-      senderId: updated.id,
-      senderName: updated.name,
-      payload: {
-        tokens: tokens.map((t) =>
-          t.school === updated.school || t.name === updated.name
-            ? { ...t, currentHp: updated.currentHp, maxHp: updated.maxHp }
-            : t
-        ),
-      },
-      timestamp: Date.now(),
-    });
+    if (hasGmControls) {
+      p2pManager.send({
+        type: 'SYNC_STATE',
+        senderId: 'gm',
+        senderName: 'Game Master',
+        payload: {
+          tokens: tokens.map((t) =>
+            t.school === updated.school || t.name === updated.name
+              ? { ...t, currentHp: updated.currentHp, maxHp: updated.maxHp }
+              : t
+          ),
+        },
+        timestamp: Date.now(),
+      });
+    } else if (!isObserver && updated.school === selectedCharacter.school) {
+      // A player may only report HP for their own Witcher; the host validates and rebroadcasts
+      p2pManager.send({
+        type: 'CHARACTER_UPDATE',
+        senderId: p2pManager.myPeerId,
+        senderName: selectedCharacter.name,
+        payload: { selfUpdate: { currentHp: updated.currentHp } },
+        timestamp: Date.now(),
+      });
+    }
   };
 
   // Award finite reward (gold, item) to a Witcher from the DM Vault
@@ -1223,6 +1584,7 @@ export const App: React.FC = () => {
 
   // Reclaim an item from a Witcher's inventory back to the DM Vault
   const handleReclaimItem = (itemId: string) => {
+    if (!hasGmControls) return;
     let foundItem: GameItem | null = null;
     let holderSchool: WitcherSchool | null = null;
 
@@ -1279,6 +1641,20 @@ export const App: React.FC = () => {
     const fromSchool = selectedCharacter.school;
     if (fromSchool === toSchool) return;
 
+    // Players cannot rewrite two character sheets themselves: they ask the Game Master's client,
+    // which moves only what is genuinely in their pack / purse and broadcasts the result.
+    if (!hasGmControls) {
+      if (isObserver) return;
+      p2pManager.send({
+        type: 'CHARACTER_UPDATE',
+        senderId: p2pManager.myPeerId,
+        senderName: selectedCharacter.name,
+        payload: { transferRequest: { toSchool, itemId, goldAmount } },
+        timestamp: Date.now(),
+      });
+      return;
+    }
+
     const fromChar = partyCharacters[fromSchool] || selectedCharacter;
     const toChar = partyCharacters[toSchool] || PREGEN_WITCHERS.find((w) => w.school === toSchool);
     if (!fromChar || !toChar) return;
@@ -1327,150 +1703,33 @@ export const App: React.FC = () => {
     });
   };
 
-  // Purchase an item from an Act Merchant
+  // Purchase an item from an Act Merchant.
+  // GM (or an offline local session): executes the sale directly, any act, any Witcher.
+  // Player: can only send a *request* for their OWN Witcher; the Game Master's client checks the
+  // price, stock, purse and active act, and broadcasts the result. Nothing is applied locally
+  // until the host confirms, so a modified client cannot pay less or take more.
   const handleMerchantPurchase = (
     buyerSchool: WitcherSchool,
     actNum: number,
     itemId: string
   ) => {
-    const currentMerchants = economyState.actMerchants || DEFAULT_ACT_MERCHANTS;
-    const merchant = currentMerchants[actNum];
-    if (!merchant) return;
-
-    const mItem = merchant.items.find((i) => i.id === itemId);
-    if (!mItem || mItem.stock <= 0) {
-      handleAddLogMessage(`⚠️ Item is out of stock.`, 'system');
+    if (hasGmControls) {
+      applyMerchantPurchase(buyerSchool, actNum, itemId, false);
       return;
     }
-
-    const buyer = partyCharacters[buyerSchool] || PREGEN_WITCHERS.find((w) => w.school === buyerSchool);
-    if (!buyer) return;
-
-    if (buyer.gold < mItem.priceGold) {
-      handleAddLogMessage(
-        `⚠️ ${buyer.name} cannot afford ${mItem.item.name}. (Needs ${mItem.priceGold} 🪙, has ${buyer.gold} 🪙)`,
-        'system'
-      );
-      return;
-    }
-
-    // Deduct gold & clone item
-    const newGold = buyer.gold - mItem.priceGold;
-    const boughtItem: GameItem = {
-      ...mItem.item,
-      assignedToSchool: buyerSchool,
-      assignedToName: buyer.name,
-      equipped: false,
-      discoverySource: `Purchased from ${merchant.name} in Act ${actNum}`,
-    };
-
-    const newInventory = [...(buyer.inventory || []), boughtItem];
-
-    // If potion, also sync to character potions list
-    let newPotions = [...buyer.potions];
-    if (boughtItem.category === 'potion') {
-      newPotions.push({
-        name: boughtItem.name.replace(/ \(Phial #\d+\)/, ''),
-        toxicity: boughtItem.toxicity || 20,
-        charges: boughtItem.charges || 2,
-        maxCharges: boughtItem.maxCharges || 2,
-        duration: boughtItem.duration || '1 minute',
-        effect: boughtItem.effect || boughtItem.description,
-      });
-    }
-
-    // If bomb, also sync to character bombs list
-    let newBombs = [...buyer.bombs];
-    if (boughtItem.category === 'bomb') {
-      newBombs.push({
-        name: boughtItem.name.replace(/ \(Pack #\d+\)/, ''),
-        count: boughtItem.charges || 2,
-        maxCount: boughtItem.maxCharges || 2,
-        radius: '15 ft sphere',
-        effect: boughtItem.effect || boughtItem.description,
-      });
-    }
-
-    // If oil, also sync to character oils list
-    let newOils = [...buyer.oils];
-    if (boughtItem.category === 'oil') {
-      newOils.push({
-        name: boughtItem.name,
-        targetCategory: boughtItem.effect?.includes('Relict') ? 'Relicts (Leshen, Chort)' :
-                        boughtItem.effect?.includes('Specter') ? 'Specters & Hounds' :
-                        boughtItem.effect?.includes('Necrophage') ? 'Necrophages (Grave Hag)' : 'Monsters',
-        bonusDamage: '+1d8 damage',
-        charges: boughtItem.charges || 10,
-        maxCharges: boughtItem.maxCharges || 10,
-      });
-    }
-
-    const updatedBuyer: WitcherCharacter = {
-      ...buyer,
-      gold: newGold,
-      inventory: newInventory,
-      potions: newPotions,
-      bombs: newBombs,
-      oils: newOils,
-    };
-
-    // Update merchant stock
-    const updatedItems = merchant.items.map((it) =>
-      it.id === itemId ? { ...it, stock: it.stock - 1 } : it
-    );
-    const updatedMerchants = {
-      ...currentMerchants,
-      [actNum]: { ...merchant, items: updatedItems },
-    };
-
-    const newRewardRecord: RewardRecord = {
-      id: `shop-${Date.now()}`,
-      timestamp: Date.now(),
-      recipientSchool: buyerSchool,
-      recipientName: buyer.name,
-      type: 'item_grant',
-      amountGold: -mItem.priceGold,
-      itemName: boughtItem.name,
-      note: `Purchased from ${merchant.name} in Act ${actNum} for ${mItem.priceGold} Orens.`,
-    };
-
-    const newEconomy: CampaignEconomyState = {
-      ...economyState,
-      dmVaultGold: economyState.dmVaultGold + mItem.priceGold,
-      rewardLog: [...economyState.rewardLog, newRewardRecord],
-      actMerchants: updatedMerchants,
-    };
-
-    setEconomyState(newEconomy);
-
-    setPartyCharacters((prev) => ({
-      ...prev,
-      [buyerSchool]: updatedBuyer,
-    }));
-
-    if (selectedCharacter.school === buyerSchool) {
-      setSelectedCharacter(updatedBuyer);
-    }
-
-    const logText = `🪙 [Waystation Outfitter] ${merchant.name} sold ${boughtItem.name} to ${buyer.name} for ${mItem.priceGold} Cintrian Orens. (${mItem.stock - 1} remaining in stock)`;
-    handleAddLogMessage(logText, 'lore');
-
+    if (isObserver || buyerSchool !== selectedCharacter.school) return;
     p2pManager.send({
       type: 'MERCHANT_PURCHASE',
-      senderId: p2pManager.myPeerId || 'gm',
-      senderName: selectedCharacter.name || 'Party',
-      payload: {
-        buyerSchool,
-        updatedCharacter: updatedBuyer,
-        economyState: newEconomy,
-        logText,
-      },
+      senderId: p2pManager.myPeerId,
+      senderName: selectedCharacter.name,
+      payload: { buyerSchool, actNum, itemId },
       timestamp: Date.now(),
     });
   };
 
   // Bulk Clear Tokens (monsters, npcs, or all)
   const handleClearTokens = (category: 'monsters' | 'npcs' | 'all') => {
+    if (!hasGmControls) return;
     let remaining = tokens;
     if (category === 'monsters') {
       remaining = tokens.filter((t) => !t.isMonster);
@@ -1494,6 +1753,7 @@ export const App: React.FC = () => {
 
   // Change Map Scene
   const handleSceneChange = (scene: MapScene) => {
+    if (!hasGmControls) return;
     setCurrentScene(scene);
 
     p2pManager.send({
@@ -1509,6 +1769,7 @@ export const App: React.FC = () => {
 
   // Show or Clear Story Visualization Image (Replaces Battle Map on all screens)
   const handleShowStoryVisual = (visual: StoryVisualOverlay | null) => {
+    if (!hasGmControls) return;
     setActiveStoryVisual(visual);
 
     p2pManager.send({
@@ -1544,6 +1805,7 @@ export const App: React.FC = () => {
 
   // Update Interactive Party Choice (Cause & Effect Engine across Acts)
   const handleUpdatePartyChoice = (record: PartyChoiceRecord) => {
+    if (!hasGmControls) return;
     const updated = {
       ...partyChoices,
       [record.choicePointId]: record,
@@ -1561,6 +1823,7 @@ export const App: React.FC = () => {
 
   // Toggle Character-Specific Spotlight Completion
   const handleToggleSpotlight = (spotlightId: string) => {
+    if (!hasGmControls) return;
     setCompletedSpotlights((prev) => ({
       ...prev,
       [spotlightId]: !prev[spotlightId],
@@ -1569,6 +1832,7 @@ export const App: React.FC = () => {
 
   // Send Read-Aloud Script or Spotlight Prompt from Module directly to Party Chat Log
   const handleSendScriptToChat = (text: string, title?: string) => {
+    if (!hasGmControls) return;
     const formatted = title ? `[${title}] ${text}` : text;
     const msg: ChatMessage = {
       id: `script-${Date.now()}`,
@@ -1710,6 +1974,7 @@ export const App: React.FC = () => {
 
   // Spawn monster from Bestiary modal
   const handleSpawnFromBestiary = (monster: Monster) => {
+    if (!hasGmControls) return;
     const newToken: MapToken = {
       id: `mon-${Date.now()}`,
       name: monster.name,
@@ -1727,6 +1992,7 @@ export const App: React.FC = () => {
 
   // Load campaign save state from file or GM storage
   const handleLoadCampaignState = (saved: CampaignSaveState) => {
+    if (!hasGmControls) return;
     if (saved.tokens && Array.isArray(saved.tokens)) setTokens(saved.tokens);
     if (saved.currentSceneId) {
       const s = MAP_SCENES.find((sc) => sc.id === saved.currentSceneId);
@@ -1772,6 +2038,7 @@ export const App: React.FC = () => {
 
   // Broadcast current state to all connected P2P players
   const handleForceSyncPeers = () => {
+    if (!isHost) return;
     p2pManager.send({
       type: 'INITIAL_STATE_SYNC',
       senderId: 'gm',
@@ -1792,6 +2059,7 @@ export const App: React.FC = () => {
 
   // Reset campaign to default
   const handleResetCampaign = () => {
+    if (!hasGmControls) return;
     storageService.clearCampaignState();
     setCurrentScene(MAP_SCENES[0]);
     setSelectedCharacter(PREGEN_WITCHERS[0]);
@@ -1850,7 +2118,7 @@ export const App: React.FC = () => {
         selectedCharacter={selectedCharacter}
         currentScene={currentScene}
         isConnected={isConnected}
-        isHost={isHost}
+        isHost={hasGmControls}
         gmPlaysWitcher={gmPlaysWitcher}
         peerCount={peerCount}
         totalPlayersInRoom={totalPlayersInRoom}
@@ -1907,6 +2175,7 @@ export const App: React.FC = () => {
                 onSendMessage={handleSendMessage}
                 currentUserName={selectedCharacter.name}
                 currentUserSchool={selectedCharacter.school}
+                isHost={hasGmControls}
               />
             </div>
           </div>
@@ -1933,7 +2202,7 @@ export const App: React.FC = () => {
               isOpen={true}
               onClose={() => setActiveTab('map')}
               onSpawnMonster={handleSpawnFromBestiary}
-              isHost={isHost}
+              isHost={hasGmControls}
             />
           </div>
         )}
@@ -1951,7 +2220,7 @@ export const App: React.FC = () => {
               completedSpotlights={completedSpotlights}
               onToggleSpotlight={handleToggleSpotlight}
               onSendScriptToChat={handleSendScriptToChat}
-              isHost={isHost}
+              isHost={hasGmControls}
               characters={partyCharacters}
               actMerchants={economyState.actMerchants}
               onBuyMerchantItem={handleMerchantPurchase}
@@ -2016,7 +2285,7 @@ export const App: React.FC = () => {
         isOpen={isBestiaryModalOpen}
         onClose={() => setIsBestiaryModalOpen(false)}
         onSpawnMonster={handleSpawnFromBestiary}
-        isHost={isHost}
+        isHost={hasGmControls}
       />
 
       {/* Adventure Guide Modal (Overlay) */}
@@ -2030,7 +2299,7 @@ export const App: React.FC = () => {
         completedSpotlights={completedSpotlights}
         onToggleSpotlight={handleToggleSpotlight}
         onSendScriptToChat={handleSendScriptToChat}
-        isHost={isHost}
+        isHost={hasGmControls}
         characters={partyCharacters}
         actMerchants={economyState.actMerchants}
         onBuyMerchantItem={handleMerchantPurchase}
@@ -2045,6 +2314,7 @@ export const App: React.FC = () => {
         onOpenGuide={() => setIsGuideModalOpen(true)}
         onOpenGMModal={() => setIsGMModalOpen(true)}
         onOpenNotionModal={() => setIsNotionModalOpen(true)}
+        isHost={hasGmControls}
       />
 
       {/* Notion Wiki & Session Chronicle Modal */}
@@ -2060,7 +2330,7 @@ export const App: React.FC = () => {
       <GMCampaignModal
         isOpen={isGMModalOpen}
         onClose={() => setIsGMModalOpen(false)}
-        isHost={isHost}
+        isHost={hasGmControls}
         tokens={tokens}
         messages={messages}
         currentScene={currentScene}
@@ -2074,7 +2344,7 @@ export const App: React.FC = () => {
       <DMInventoryModal
         isOpen={isDMInventoryModalOpen}
         onClose={() => setIsDMInventoryModalOpen(false)}
-        isHost={isHost}
+        isHost={hasGmControls}
         economyState={economyState}
         characters={partyCharacters}
         onAwardReward={handleAwardReward}

@@ -250,22 +250,24 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </div>
                 )}
 
-                {/* GM Save & Local Backup */}
-                <div className="border-t border-[#22272d] my-1 pt-1">
-                  <button
-                    onClick={() => {
-                      setIsCompendiumOpen(false);
-                      onOpenGMModal();
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-xs font-cinzel text-[#d6d9dc] hover:text-white hover:bg-[#1e2329] transition-colors group"
-                  >
-                    <HardDrive className="w-4 h-4 text-sky-400 shrink-0 group-hover:scale-110 transition-transform" />
-                    <div>
-                      <div className="font-bold text-white group-hover:text-sky-300">GM Save & Local Backup</div>
-                      <div className="text-[10px] text-[#78828c] font-mono">Campaign State Management</div>
-                    </div>
-                  </button>
-                </div>
+                {/* GM Save & Local Backup (Host Only) */}
+                {isHost && (
+                  <div className="border-t border-[#22272d] my-1 pt-1">
+                    <button
+                      onClick={() => {
+                        setIsCompendiumOpen(false);
+                        onOpenGMModal();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-xs font-cinzel text-[#d6d9dc] hover:text-white hover:bg-[#1e2329] transition-colors group"
+                    >
+                      <HardDrive className="w-4 h-4 text-sky-400 shrink-0 group-hover:scale-110 transition-transform" />
+                      <div>
+                        <div className="font-bold text-white group-hover:text-sky-300">GM Save & Local Backup</div>
+                        <div className="text-[10px] text-[#78828c] font-mono">Campaign State Management</div>
+                      </div>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

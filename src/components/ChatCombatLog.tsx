@@ -23,6 +23,7 @@ interface ChatCombatLogProps {
   currentUserSchool?: WitcherSchool;
   onOpenNotionModal?: () => void;
   onOpenInstructions?: () => void;
+  isHost?: boolean;
 }
 
 export const ChatCombatLog: React.FC<ChatCombatLogProps> = ({
@@ -31,12 +32,20 @@ export const ChatCombatLog: React.FC<ChatCombatLogProps> = ({
   currentUserName = 'Witcher',
   onOpenNotionModal,
   onOpenInstructions,
+  isHost = false,
 }) => {
   const [inputText, setInputText] = useState('');
   const [filter, setFilter] = useState<'all' | 'rolls' | 'combat' | 'roleplay'>('all');
   const [speechMode, setSpeechMode] = useState<SpeechRoleplayMode>('ic');
   const [autoSendOnPause, setAutoSendOnPause] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+
+  // If a player had DM mode selected, automatically revert to In-Character
+  useEffect(() => {
+    if (!isHost && speechMode === 'dm') {
+      setSpeechMode('ic');
+    }
+  }, [isHost, speechMode]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoSendTimerRef = useRef<any>(null);
@@ -385,15 +394,17 @@ export const ChatCombatLog: React.FC<ChatCombatLogProps> = ({
           >
             🎭 In-Character
           </button>
-          <button
-            type="button"
-            onClick={() => setSpeechMode('dm')}
-            className={`px-2 py-0.5 rounded transition-all ${
-              speechMode === 'dm' ? 'bg-purple-900/60 border border-purple-500/50 text-purple-300 font-bold' : 'text-[#8a929a] hover:text-white'
-            }`}
-          >
-            👑 DM Narration
-          </button>
+          {isHost && (
+            <button
+              type="button"
+              onClick={() => setSpeechMode('dm')}
+              className={`px-2 py-0.5 rounded transition-all ${
+                speechMode === 'dm' ? 'bg-purple-900/60 border border-purple-500/50 text-purple-300 font-bold' : 'text-[#8a929a] hover:text-white'
+              }`}
+            >
+              👑 DM Narration
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setSpeechMode('ooc')}

@@ -207,13 +207,24 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
               return (
                 <button
                   key={scene.id}
-                  onClick={() => onSceneChange(scene)}
+                  onClick={() => {
+                    if (isHost) onSceneChange(scene);
+                  }}
+                  disabled={!isHost}
                   className={`px-2.5 py-1 rounded-md text-xs font-cinzel transition-all flex items-center gap-1 ${
                     isCurrent
                       ? 'bg-[#c99a45] text-black font-bold shadow-sm'
-                      : 'text-[#8a929a] hover:text-white hover:bg-[#1e2328]'
+                      : isHost
+                      ? 'text-[#8a929a] hover:text-white hover:bg-[#1e2328]'
+                      : 'text-[#505760] cursor-not-allowed opacity-60'
                   }`}
-                  title={`Act ${scene.actNumber}: ${scene.name} (${scene.subtitle})`}
+                  title={
+                    isHost
+                      ? `Switch scene to Act ${scene.actNumber}: ${scene.name} (${scene.subtitle})`
+                      : isCurrent
+                      ? `Active Act ${scene.actNumber}: ${scene.name} (Set by Game Master)`
+                      : `Act ${scene.actNumber} (Scene changes are controlled by the Game Master)`
+                  }
                 >
                   <span>Act {roman}</span>
                 </button>
@@ -269,8 +280,8 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
             <Grid className="w-4 h-4" />
           </button>
 
-          {/* Story Art Toggle */}
-          {onShowStoryVisual && (
+          {/* Story Art Toggle (GM Only) */}
+          {isHost && onShowStoryVisual && (
             activeStoryVisual ? (
               <button
                 onClick={() => onShowStoryVisual(null)}
@@ -330,7 +341,7 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
                 </span>
               </div>
 
-              {onShowStoryVisual && (
+              {isHost && onShowStoryVisual ? (
                 <button
                   onClick={() => onShowStoryVisual(null)}
                   className="px-3.5 py-1.5 rounded-lg bg-black/80 hover:bg-[#1c2127] border border-white/20 text-white font-cinzel font-bold text-xs flex items-center gap-1.5 backdrop-blur-md shadow-xl transition-all"
@@ -338,6 +349,11 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
                   <MapIcon className="w-3.5 h-3.5 text-amber-400" />
                   <span>Return to Tactical Battle Map</span>
                 </button>
+              ) : (
+                <div className="px-3 py-1.5 rounded-full bg-black/80 border border-white/20 text-[11px] font-cinzel text-[#c99a45] flex items-center gap-1.5 backdrop-blur-md shadow-xl">
+                  <Lock className="w-3 h-3 text-[#c99a45]" />
+                  <span>Story Scene (Controlled by Game Master)</span>
+                </div>
               )}
             </div>
 
@@ -399,6 +415,12 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
               const currentHp = token.currentHp ?? token.maxHp;
               const hpPct = Math.max(0, Math.min(100, (currentHp / token.maxHp) * 100));
               const isDead = currentHp <= 0;
+              const canEditThisToken = Boolean(
+                isHost ||
+                (token.school && token.school === selectedCharacter?.school) ||
+                token.name === selectedCharacter?.name ||
+                token.id === selectedCharacter?.id
+              );
 
               return (
                 <div
@@ -446,17 +468,19 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
                   {token.maxHp && (
                     <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1 z-30">
                       
-                      {/* Direct -5 Quick Tap Button (visible on hover) */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleHpDelta(token.id, -5);
-                        }}
-                        className="w-4 h-4 rounded-full bg-rose-950 border border-rose-600 text-rose-300 text-[10px] font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-900 hover:scale-110 shadow-lg"
-                        title="Quick -5 Damage"
-                      >
-                        -
-                      </button>
+                      {/* Direct -5 Quick Tap Button (visible on hover only if editable) */}
+                      {canEditThisToken && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleHpDelta(token.id, -5);
+                          }}
+                          className="w-4 h-4 rounded-full bg-rose-950 border border-rose-600 text-rose-300 text-[10px] font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-900 hover:scale-110 shadow-lg"
+                          title="Quick -5 Damage"
+                        >
+                          -
+                        </button>
+                      )}
 
                       {/* Health Meter Pill */}
                       <div className="w-10 sm:w-12 bg-black/90 rounded-full h-2 p-0.5 border border-white/30 overflow-hidden shadow">
@@ -474,17 +498,19 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
                         />
                       </div>
 
-                      {/* Direct +5 Quick Tap Button (visible on hover) */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleHpDelta(token.id, 5);
-                        }}
-                        className="w-4 h-4 rounded-full bg-emerald-950 border border-emerald-600 text-emerald-300 text-[10px] font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-emerald-900 hover:scale-110 shadow-lg"
-                        title="Quick +5 Heal"
-                      >
-                        +
-                      </button>
+                      {/* Direct +5 Quick Tap Button (visible on hover only if editable) */}
+                      {canEditThisToken && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleHpDelta(token.id, 5);
+                          }}
+                          className="w-4 h-4 rounded-full bg-emerald-950 border border-emerald-600 text-emerald-300 text-[10px] font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-emerald-900 hover:scale-110 shadow-lg"
+                          title="Quick +5 Heal"
+                        >
+                          +
+                        </button>
+                      )}
                     </div>
                   )}
 
@@ -611,138 +637,162 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
                   </div>
                 </div>
 
-                {/* Quick Health Buttons Grid */}
-                <div className="space-y-2 pt-1">
-                  <div className="flex items-center justify-between text-[10px] font-cinzel text-[#8a929a]">
-                    <span className="text-rose-400 font-bold">Quick Damage:</span>
-                    <span className="text-emerald-400 font-bold">Quick Heal:</span>
-                  </div>
+                {/* Quick Health Buttons or Read-Only State */}
+                {canMoveSelectedToken ? (
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center justify-between text-[10px] font-cinzel text-[#8a929a]">
+                      <span className="text-rose-400 font-bold">Quick Damage:</span>
+                      <span className="text-emerald-400 font-bold">Quick Heal:</span>
+                    </div>
 
-                  <div className="grid grid-cols-6 gap-1">
-                    {/* Quick Damage Buttons */}
-                    <button
-                      onClick={() => handleHpDelta(selectedToken.id, -10)}
-                      className="py-1 bg-rose-950/60 hover:bg-rose-900 border border-rose-700/60 text-rose-300 text-xs font-mono font-bold rounded transition-colors"
-                      title="Deal 10 Damage"
-                    >
-                      -10
-                    </button>
-                    <button
-                      onClick={() => handleHpDelta(selectedToken.id, -5)}
-                      className="py-1 bg-rose-950/60 hover:bg-rose-900 border border-rose-700/60 text-rose-300 text-xs font-mono font-bold rounded transition-colors"
-                      title="Deal 5 Damage"
-                    >
-                      -5
-                    </button>
-                    <button
-                      onClick={() => handleHpDelta(selectedToken.id, -1)}
-                      className="py-1 bg-rose-950/60 hover:bg-rose-900 border border-rose-700/60 text-rose-300 text-xs font-mono font-bold rounded transition-colors"
-                      title="Deal 1 Damage"
-                    >
-                      -1
-                    </button>
-
-                    {/* Quick Heal Buttons */}
-                    <button
-                      onClick={() => handleHpDelta(selectedToken.id, 1)}
-                      className="py-1 bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-300 text-xs font-mono font-bold rounded transition-colors"
-                      title="Heal 1 HP"
-                    >
-                      +1
-                    </button>
-                    <button
-                      onClick={() => handleHpDelta(selectedToken.id, 5)}
-                      className="py-1 bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-300 text-xs font-mono font-bold rounded transition-colors"
-                      title="Heal 5 HP"
-                    >
-                      +5
-                    </button>
-                    <button
-                      onClick={() => handleHpDelta(selectedToken.id, 10)}
-                      className="py-1 bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-300 text-xs font-mono font-bold rounded transition-colors"
-                      title="Heal 10 HP"
-                    >
-                      +10
-                    </button>
-                  </div>
-
-                  {/* Custom Exact Damage/Heal Input */}
-                  <div className="flex items-center gap-1.5 pt-1">
-                    <input
-                      type="number"
-                      value={customHpDelta}
-                      onChange={(e) => setCustomHpDelta(e.target.value)}
-                      placeholder="Custom amount..."
-                      className="flex-1 px-2.5 py-1 bg-[#181a1d] border border-[#2d343c] rounded text-xs text-white placeholder-[#616a73] font-mono focus:outline-none focus:border-[#c99a45]"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleApplyCustomHp(true);
-                      }}
-                    />
-                    <button
-                      onClick={() => handleApplyCustomHp(true)}
-                      className="px-2.5 py-1 bg-rose-950 hover:bg-rose-900 border border-rose-700 text-rose-300 text-xs font-cinzel rounded font-bold transition-colors"
-                      title="Apply as Damage"
-                    >
-                      Dmg
-                    </button>
-                    <button
-                      onClick={() => handleApplyCustomHp(false)}
-                      className="px-2.5 py-1 bg-emerald-950 hover:bg-emerald-900 border border-emerald-700 text-emerald-300 text-xs font-cinzel rounded font-bold transition-colors"
-                      title="Apply as Heal"
-                    >
-                      Heal
-                    </button>
-                  </div>
-
-                  {/* Fast Action Presets Row */}
-                  <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-[#23282f] text-xs">
-                    <div className="flex items-center gap-1.5">
+                    <div className="grid grid-cols-6 gap-1">
+                      {/* Quick Damage Buttons */}
                       <button
-                        onClick={() => handleSetHp(selectedToken.id, selectedToken.maxHp)}
-                        className="px-2 py-1 rounded bg-[#1c2024] hover:bg-[#252b31] border border-[#303841] text-emerald-300 text-[10px] font-cinzel flex items-center gap-1"
-                        title="Restore to Full HP"
+                        onClick={() => handleHpDelta(selectedToken.id, -10)}
+                        className="py-1 bg-rose-950/60 hover:bg-rose-900 border border-rose-700/60 text-rose-300 text-xs font-mono font-bold rounded transition-colors"
+                        title="Deal 10 Damage"
                       >
-                        <Heart className="w-3 h-3 text-emerald-400" />
-                        <span>Full HP</span>
+                        -10
+                      </button>
+                      <button
+                        onClick={() => handleHpDelta(selectedToken.id, -5)}
+                        className="py-1 bg-rose-950/60 hover:bg-rose-900 border border-rose-700/60 text-rose-300 text-xs font-mono font-bold rounded transition-colors"
+                        title="Deal 5 Damage"
+                      >
+                        -5
+                      </button>
+                      <button
+                        onClick={() => handleHpDelta(selectedToken.id, -1)}
+                        className="py-1 bg-rose-950/60 hover:bg-rose-900 border border-rose-700/60 text-rose-300 text-xs font-mono font-bold rounded transition-colors"
+                        title="Deal 1 Damage"
+                      >
+                        -1
                       </button>
 
+                      {/* Quick Heal Buttons */}
                       <button
-                        onClick={() => handleSetHp(selectedToken.id, 0)}
-                        className="px-2 py-1 rounded bg-[#1c2024] hover:bg-[#252b31] border border-[#303841] text-rose-300 text-[10px] font-cinzel flex items-center gap-1"
-                        title="Set HP to 0 (Unconscious or Defeated)"
+                        onClick={() => handleHpDelta(selectedToken.id, 1)}
+                        className="py-1 bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-300 text-xs font-mono font-bold rounded transition-colors"
+                        title="Heal 1 HP"
                       >
-                        <Skull className="w-3 h-3 text-rose-400" />
-                        <span>0 HP</span>
+                        +1
+                      </button>
+                      <button
+                        onClick={() => handleHpDelta(selectedToken.id, 5)}
+                        className="py-1 bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-300 text-xs font-mono font-bold rounded transition-colors"
+                        title="Heal 5 HP"
+                      >
+                        +5
+                      </button>
+                      <button
+                        onClick={() => handleHpDelta(selectedToken.id, 10)}
+                        className="py-1 bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-300 text-xs font-mono font-bold rounded transition-colors"
+                        title="Heal 10 HP"
+                      >
+                        +10
                       </button>
                     </div>
 
-                    {/* View Character Sheet Link for Witchers */}
-                    {selectedToken.school && onOpenWitcherSheet && (
-                      <button
-                        onClick={() => onOpenWitcherSheet(selectedToken.school!)}
-                        className="px-2.5 py-1 rounded bg-[#c99a45]/20 hover:bg-[#c99a45]/30 border border-[#c99a45]/50 text-[#e2ba6d] text-[10px] font-cinzel font-bold flex items-center gap-1 transition-colors"
-                      >
-                        <Shield className="w-3 h-3" />
-                        <span>Open Sheet</span>
-                      </button>
-                    )}
-
-                    {/* Remove Token for GMs */}
-                    {isHost && onTokenRemove && (
-                      <button
-                        onClick={() => {
-                          onTokenRemove(selectedToken.id);
-                          setSelectedTokenId(null);
+                    {/* Custom Exact Damage/Heal Input */}
+                    <div className="flex items-center gap-1.5 pt-1">
+                      <input
+                        type="number"
+                        value={customHpDelta}
+                        onChange={(e) => setCustomHpDelta(e.target.value)}
+                        placeholder="Custom amount..."
+                        className="flex-1 px-2.5 py-1 bg-[#181a1d] border border-[#2d343c] rounded text-xs text-white placeholder-[#616a73] font-mono focus:outline-none focus:border-[#c99a45]"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleApplyCustomHp(true);
                         }}
-                        className="p-1 rounded bg-red-950/40 hover:bg-red-900/60 text-red-400 hover:text-white transition-colors"
-                        title="Remove token from map"
+                      />
+                      <button
+                        onClick={() => handleApplyCustomHp(true)}
+                        className="px-2.5 py-1 bg-rose-950 hover:bg-rose-900 border border-rose-700 text-rose-300 text-xs font-cinzel rounded font-bold transition-colors"
+                        title="Apply as Damage"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        Dmg
                       </button>
+                      <button
+                        onClick={() => handleApplyCustomHp(false)}
+                        className="px-2.5 py-1 bg-emerald-950 hover:bg-emerald-900 border border-emerald-700 text-emerald-300 text-xs font-cinzel rounded font-bold transition-colors"
+                        title="Apply as Heal"
+                      >
+                        Heal
+                      </button>
+                    </div>
+
+                    {/* Fast Action Presets Row */}
+                    <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-[#23282f] text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleSetHp(selectedToken.id, selectedToken.maxHp)}
+                          className="px-2 py-1 rounded bg-[#1c2024] hover:bg-[#252b31] border border-[#303841] text-emerald-300 text-[10px] font-cinzel flex items-center gap-1"
+                          title="Restore to Full HP"
+                        >
+                          <Heart className="w-3 h-3 text-emerald-400" />
+                          <span>Full HP</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleSetHp(selectedToken.id, 0)}
+                          className="px-2 py-1 rounded bg-[#1c2024] hover:bg-[#252b31] border border-[#303841] text-rose-300 text-[10px] font-cinzel flex items-center gap-1"
+                          title="Set HP to 0 (Unconscious or Defeated)"
+                        >
+                          <Skull className="w-3 h-3 text-rose-400" />
+                          <span>0 HP</span>
+                        </button>
+                      </div>
+
+                      {/* View Character Sheet Link for Witchers */}
+                      {selectedToken.school && onOpenWitcherSheet && (
+                        <button
+                          onClick={() => onOpenWitcherSheet(selectedToken.school!)}
+                          className="px-2.5 py-1 rounded bg-[#c99a45]/20 hover:bg-[#c99a45]/30 border border-[#c99a45]/50 text-[#e2ba6d] text-[10px] font-cinzel font-bold flex items-center gap-1 transition-colors"
+                        >
+                          <Shield className="w-3 h-3" />
+                          <span>Open Sheet</span>
+                        </button>
+                      )}
+
+                      {/* Remove Token for GMs */}
+                      {isHost && onTokenRemove && (
+                        <button
+                          onClick={() => {
+                            onTokenRemove(selectedToken.id);
+                            setSelectedTokenId(null);
+                          }}
+                          className="p-1 rounded bg-red-950/40 hover:bg-red-900/60 text-red-400 hover:text-white transition-colors"
+                          title="Remove token from map"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-2.5 rounded-lg bg-black/40 border border-white/10 text-center space-y-1.5 mt-2">
+                    <div className="flex items-center justify-center gap-1.5 text-xs font-cinzel text-amber-300 font-bold">
+                      <Lock className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Read-Only Health Meter</span>
+                    </div>
+                    <p className="text-[10px] text-[#8a929a] font-cormorant italic leading-relaxed">
+                      Only the Game Master or the player controlling {selectedToken.name} can alter health or reposition this token.
+                    </p>
+                    {selectedToken.school && onOpenWitcherSheet && (
+                      <div className="pt-1 flex justify-center">
+                        <button
+                          onClick={() => onOpenWitcherSheet(selectedToken.school!)}
+                          className="px-2.5 py-1 rounded bg-[#c99a45]/20 hover:bg-[#c99a45]/30 border border-[#c99a45]/50 text-[#e2ba6d] text-[10px] font-cinzel font-bold inline-flex items-center gap-1 transition-colors"
+                        >
+                          <Shield className="w-3 h-3" />
+                          <span>Inspect Witcher Sheet</span>
+                        </button>
+                      </div>
                     )}
                   </div>
+                )}
 
-                  <p className="text-[10px] font-mono text-center pt-0.5">
+                  <p className="text-[10px] font-mono text-center pt-2">
                     {canMoveSelectedToken ? (
                       <span className="text-[#8a929a]">
                         Click anywhere on the map to reposition token
@@ -754,7 +804,6 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
                       </span>
                     )}
                   </p>
-                </div>
               </div>
             )}
 

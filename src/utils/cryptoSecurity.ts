@@ -21,6 +21,9 @@ export interface HandshakeFrame {
   ts: number;
 }
 
+// Packets only the Game Master (host) may originate. Clients that send any of these are dropped.
+// PLAYER_JOIN is included because it makes the host rebroadcast the full campaign state to
+// everyone; the host generates it locally after authenticating a peer, clients never should.
 const HOST_ONLY_PACKET_TYPES = new Set<P2PPacket['type']>([
   'INITIAL_STATE_SYNC',
   'SYNC_STATE',
@@ -30,6 +33,8 @@ const HOST_ONLY_PACKET_TYPES = new Set<P2PPacket['type']>([
   'CHARACTER_ASSIGNMENT_SYNC',
   'STORY_VISUAL_SYNC',
   'PARTY_CHOICES_SYNC',
+  'ECONOMY_SYNC',
+  'PLAYER_JOIN',
 ]);
 
 const VALID_PACKET_TYPES = new Set<P2PPacket['type']>([
@@ -48,7 +53,11 @@ const VALID_PACKET_TYPES = new Set<P2PPacket['type']>([
   'CHARACTER_ASSIGNMENT_SYNC',
   'STORY_VISUAL_SYNC',
   'PARTY_CHOICES_SYNC',
+  'ECONOMY_SYNC',
+  'MERCHANT_PURCHASE',
 ]);
+
+const VALID_SCHOOLS = new Set(['Wolf', 'Cat', 'Griffin', 'Bear']);
 
 // Convert ArrayBuffer / Uint8Array to Base64
 function bytesToBase64(bytes: Uint8Array): string {
@@ -357,7 +366,7 @@ export function validateAndSanitizePacket(
       if (!payload || typeof payload !== 'object') {
         return { valid: false, reason: `Invalid ${type} payload` };
       }
-      const sanitizedMsg = {
+      const sanitizedMsg: Record<string, unknown> = {
         ...payload,
         id: sanitizeString(payload.id, 80) || `msg-${Date.now()}`,
         senderId: sanitizeString(payload.senderId, 80) || senderId,
@@ -365,6 +374,15 @@ export function validateAndSanitizePacket(
         text: sanitizeString(payload.text, 1500),
         timestamp: clampNumber(payload.timestamp, 0, Date.now() + 300000, Date.now()),
       };
+
+      // A client may never speak with the Game Master's voice. The host re-stamps the real
+      // identity as well (see App guard), this is the schema-level backstop.
+      if (!isFromHost) {
+        delete sanitizedMsg.isDM;
+        if (sanitizedMsg.speechMode === 'dm') sanitizedMsg.speechMode = 'ic';
+        if (sanitizedMsg.type === 'lore') sanitizedMsg.type = 'chat';
+      }
+
       return {
         valid: true,
         packet: {
@@ -372,6 +390,30 @@ export function validateAndSanitizePacket(
           senderId,
           senderName,
           payload: sanitizedMsg,
+          timestamp,
+        },
+      };
+    }
+
+    case 'MERCHANT_PURCHASE': {
+      // Client -> Host purchase *request*. Contains no prices, gold or items: the host looks
+      // everything up itself, so a client cannot choose what it pays or receives.
+      if (!payload || typeof payload !== 'object') {
+        return { valid: false, reason: 'Invalid MERCHANT_PURCHASE payload' };
+      }
+      const buyerSchool = sanitizeString(payload.buyerSchool, 20);
+      const actNum = Math.round(clampNumber(payload.actNum, 1, 4, 0));
+      const itemId = sanitizeString(payload.itemId, 80);
+      if (!VALID_SCHOOLS.has(buyerSchool) || actNum < 1 || !itemId) {
+        return { valid: false, reason: 'Malformed MERCHANT_PURCHASE request' };
+      }
+      return {
+        valid: true,
+        packet: {
+          type,
+          senderId,
+          senderName,
+          payload: { buyerSchool, actNum, itemId },
           timestamp,
         },
       };

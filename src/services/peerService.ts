@@ -30,6 +30,23 @@ const MAX_PACKETS_PER_SEC = 25;
 const MAX_CLIENT_PAYLOAD_BYTES = 65536; // 64 KB max from a client
 const CONNECTION_TIMEOUT_MS = 12000; // 12 seconds
 
+// Packet types the host is allowed to relay verbatim to the other players. Everything else a
+// client sends (claims, character updates, purchase requests) is only a *request*: the host
+// adjudicates it and broadcasts its own authoritative result instead of forwarding the request.
+const RELAYED_CLIENT_PACKET_TYPES = new Set<P2PPacket['type']>([
+  'CHAT_MESSAGE',
+  'DICE_ROLL',
+  'TOKEN_MOVE',
+  'PING_COORDINATE',
+]);
+
+/**
+ * Host-side authorization hook. Receives a schema-validated packet from an authenticated client
+ * (with senderId/senderName already overwritten by the host with the verified peer identity) and
+ * returns the packet to process, or null to drop it.
+ */
+export type ClientPacketGuard = (packet: P2PPacket, peer: ConnectedPeerInfo) => P2PPacket | null;
+
 const ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
@@ -76,6 +93,23 @@ export class P2PManager {
     this.onPeersUpdateCallback = onPeersUpdate || null;
   }
 
+  private packetGuard: ClientPacketGuard | null = null;
+
+  /** Installs the host-side authorization hook for packets coming from clients. */
+  public setPacketGuard(guard: ClientPacketGuard | null) {
+    this.packetGuard = guard;
+  }
+
+  /** Host-only: records which Witcher school a peer actually holds (derived from GM-approved claims). */
+  public setPeerSchool(peerId: string, school: string | undefined) {
+    if (!this.isHost) return;
+    const info = this.authenticatedPeers.get(peerId);
+    if (info && info.school !== school) {
+      info.school = school;
+      this.notifyPeersUpdated();
+    }
+  }
+
   private notifyPeersUpdated() {
     const list = Array.from(this.authenticatedPeers.values());
     this.onPeerCountCallback?.(this.isHost ? list.length : this.isConnected ? 1 : 0);
@@ -83,6 +117,7 @@ export class P2PManager {
   }
 
   public setRoomLocked(locked: boolean) {
+    if (!this.isHost) return; // Only the Game Master controls the room lock
     this.isRoomLocked = locked;
     if (this.isHost && this.isConnected) {
       const playerPeers = Array.from(this.authenticatedPeers.values()).filter((p) => !p.isObserver).length;
@@ -476,18 +511,33 @@ export class P2PManager {
           return;
         }
 
-        // Update peer's character/school info if they sent a roll or chat
-        if (validation.packet.payload?.school) {
-          const info = this.authenticatedPeers.get(remotePeerId);
-          if (info) {
-            info.school = validation.packet.payload.school;
-            this.notifyPeersUpdated();
-          }
+        // Never trust the identity a client claims. Overwrite it with the verified peer identity
+        // so nobody can pose as the Game Master ('gm') or as another player.
+        const peerInfo = this.authenticatedPeers.get(remotePeerId);
+        if (!peerInfo) return;
+        const stamped: P2PPacket = {
+          ...validation.packet,
+          senderId: remotePeerId,
+          senderName: peerInfo.playerName,
+        };
+
+        // Fail closed: without an installed authorization guard, no client packet is processed.
+        if (!this.packetGuard) {
+          console.warn('No packet guard installed; dropping client packet');
+          return;
+        }
+        const authorized = this.packetGuard(stamped, peerInfo);
+        if (!authorized) {
+          console.warn(`Host guard rejected '${stamped.type}' from ${peerInfo.playerName} (${remotePeerId})`);
+          return;
         }
 
-        // Execute on Host and relay to other authenticated peers
-        this.onPacketCallback?.(validation.packet);
-        await this.broadcast(validation.packet, remotePeerId);
+        // Execute on Host. Only whitelisted, already-authorized packets are relayed to other
+        // players; request-style packets are answered by the host with its own broadcast.
+        this.onPacketCallback?.(authorized);
+        if (RELAYED_CLIENT_PACKET_TYPES.has(authorized.type)) {
+          await this.broadcast(authorized, remotePeerId);
+        }
       } catch (e) {
         console.error('Error handling host data:', e);
       }

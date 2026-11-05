@@ -374,8 +374,7 @@ export interface P2PPacket {
     | 'STORY_VISUAL_SYNC'
     | 'PARTY_CHOICES_SYNC'
     | 'ECONOMY_SYNC'
-    | 'MERCHANT_PURCHASE'
-    | 'MERCHANT_SYNC';
+    | 'MERCHANT_PURCHASE';
   senderId: string;
   senderName: string;
   payload: any;
