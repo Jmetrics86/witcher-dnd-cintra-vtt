@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { X, BookOpen, AlertTriangle, ShieldAlert, Sparkles, Sword } from 'lucide-react';
 import { Monster } from '../types';
 import { MONSTERS } from '../data/monsters';
+import { scaleMonster, getScalingFactors } from '../utils/monsterScaling';
 
 interface BestiaryModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSpawnMonster?: (monster: Monster) => void;
   isHost?: boolean;
+  partySize?: number;
 }
 
 export const BestiaryModal: React.FC<BestiaryModalProps> = ({
@@ -15,8 +17,12 @@ export const BestiaryModal: React.FC<BestiaryModalProps> = ({
   onClose,
   onSpawnMonster,
   isHost,
+  partySize = 1,
 }) => {
   const [selectedMonster, setSelectedMonster] = useState<Monster>(MONSTERS[0]);
+  const effectivePartySize = Math.max(1, Math.min(4, Math.floor(partySize || 1)));
+  const displayMonster = scaleMonster(selectedMonster, effectivePartySize);
+  const scaling = getScalingFactors(effectivePartySize);
 
   if (!isOpen) return null;
 
@@ -29,8 +35,13 @@ export const BestiaryModal: React.FC<BestiaryModalProps> = ({
           <div className="flex items-center gap-2.5">
             <BookOpen className="w-5 h-5 text-red-400" />
             <div>
-              <h2 className="font-cinzel text-lg font-bold text-white tracking-wide">
-                Witcher Bestiary: Monstrum of Cintra
+              <h2 className="font-cinzel text-lg font-bold text-white tracking-wide flex items-center gap-2 flex-wrap">
+                <span>Witcher Bestiary: Monstrum of Cintra</span>
+                {effectivePartySize > 1 && (
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-red-950/60 text-red-300 border border-red-700/50 font-bold">
+                    Party Size: {effectivePartySize} ({scaling.hpMultiplier}x HP, +{scaling.attackBonusOffset} to hit, +{scaling.damageBonusOffset} dmg)
+                  </span>
+                )}
               </h2>
               <p className="text-xs text-[#8a929a] font-cormorant italic">
                 Scholarly classifications, weaknesses, and signs for primeval beasts.
@@ -106,7 +117,7 @@ export const BestiaryModal: React.FC<BestiaryModalProps> = ({
 
                   {isHost && onSpawnMonster && (
                     <button
-                      onClick={() => onSpawnMonster(selectedMonster)}
+                      onClick={() => onSpawnMonster(displayMonster)}
                       className="px-3 py-1.5 bg-red-900/60 hover:bg-red-800 text-red-200 border border-red-600/50 rounded text-xs font-cinzel transition-all shadow"
                     >
                       + Spawn on Battle Map
@@ -122,7 +133,14 @@ export const BestiaryModal: React.FC<BestiaryModalProps> = ({
                   </div>
                   <div>
                     <div className="text-[10px] text-[#717b85] font-cinzel">Hit Points</div>
-                    <div className="font-bold text-red-400">{selectedMonster.hp}</div>
+                    <div className="font-bold text-red-400">
+                      {displayMonster.hp}
+                      {effectivePartySize > 1 && (
+                        <span className="text-[10px] text-amber-300 font-normal ml-1">
+                          ({scaling.hpMultiplier}x)
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <div className="text-[10px] text-[#717b85] font-cinzel">Challenge</div>
@@ -155,7 +173,7 @@ export const BestiaryModal: React.FC<BestiaryModalProps> = ({
                 <span>Attacks & Actions</span>
               </h4>
               <div className="space-y-2">
-                {selectedMonster.attacks.map((atk) => (
+                {displayMonster.attacks.map((atk) => (
                   <div key={atk.name} className="p-3 bg-[#111315] border border-[#252a30] rounded-lg text-xs">
                     <div className="flex items-center justify-between">
                       <span className="font-cinzel font-bold text-white">{atk.name}</span>

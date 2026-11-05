@@ -319,6 +319,10 @@ export interface MapToken {
   ac?: number;
   title?: string;
   tokenType?: 'monster' | 'witcher' | 'npc' | 'custom';
+  baseMaxHp?: number;
+  scaledPartySize?: number;
+  attacks?: MonsterAttack[];
+  monsterId?: string;
 }
 
 export interface DiceRollMessage {

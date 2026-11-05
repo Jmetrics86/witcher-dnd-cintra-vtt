@@ -131,7 +131,7 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
     const newSilver = {
       name: weaponItem.name,
       attackBonus: weaponItem.attackBonus || 7,
-      damage: weaponItem.damage || '1d8 + 4 (+2d6 silver)',
+      damage: weaponItem.damage || '1d8 + 4',
       damageType: weaponItem.damageType || 'Silver / Slashing',
       properties: weaponItem.properties || ['Versatile', 'Silver'],
       description: weaponItem.description,

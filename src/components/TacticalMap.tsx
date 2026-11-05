@@ -46,6 +46,7 @@ interface TacticalMapProps {
   actMerchants?: Record<number, ActMerchant>;
   partyCharacters?: WitcherCharacter[] | Record<string, WitcherCharacter>;
   onBuyMerchantItem?: (buyerSchool: WitcherSchool, actNum: number, itemId: string) => void;
+  partySize?: number;
 }
 
 export const TacticalMap: React.FC<TacticalMapProps> = ({
@@ -71,6 +72,7 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
   actMerchants,
   partyCharacters,
   onBuyMerchantItem,
+  partySize = 1,
 }) => {
   const [showGrid, setShowGrid] = useState(true);
   const [activeTool, setActiveTool] = useState<'move' | 'ping'>('move');
@@ -701,6 +703,11 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
                             <span>Linked Sheet</span>
                           </span>
                         )}
+                        {selectedToken.isMonster && (
+                          <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-red-950/60 text-red-300 border border-red-700/50 font-bold">
+                            {selectedToken.scaledPartySize ? `Party Size: ${selectedToken.scaledPartySize}` : `Scaled: ${partySize}p`}
+                          </span>
+                        )}
                       </div>
                       <p className="text-[10px] text-[#8a929a] font-cormorant italic truncate mt-0.5">
                         {selectedToken.title || (selectedToken.isMonster ? 'Monstrous Creature' : 'Witcher Character')}
@@ -900,6 +907,31 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
                   </div>
                 )}
 
+                {/* Monster Attacks List */}
+                {selectedToken.isMonster && selectedToken.attacks && selectedToken.attacks.length > 0 && (
+                  <div className="pt-2 border-t border-[#23282f] space-y-1">
+                    <div className="text-[10px] font-cinzel font-bold text-red-300 flex items-center justify-between">
+                      <span>Monster Actions:</span>
+                      <span className="text-[#8a929a] font-mono text-[9px]">
+                        Party Size {selectedToken.scaledPartySize || partySize}
+                      </span>
+                    </div>
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                      {selectedToken.attacks.map((atk, idx) => (
+                        <div key={idx} className="p-1.5 rounded bg-[#131517] border border-[#262c33] text-[10px]">
+                          <div className="flex items-center justify-between font-mono">
+                            <span className="font-cinzel text-white font-bold">{atk.name}</span>
+                            <span className="text-red-300">+{atk.bonus} to hit | {atk.damage}</span>
+                          </div>
+                          {atk.description && (
+                            <p className="text-[#78828c] text-[9px] mt-0.5">{atk.description}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                   <p className="text-[10px] font-mono text-center pt-2">
                     {canMoveSelectedToken ? (
                       <span className="text-[#8a929a]">
@@ -957,6 +989,7 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
         onRemoveToken={onTokenRemove}
         onClearCategory={onClearCategory}
         onUpdateTokenHp={handleHpDelta}
+        partySize={partySize}
       />
 
     </div>

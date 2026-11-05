@@ -21,6 +21,7 @@ import { MapToken } from '../types';
 import { MONSTERS } from '../data/monsters';
 import { PREGEN_WITCHERS } from '../data/characters';
 import { NPCS } from '../data/npcs';
+import { scaleMonsterHp, scaleMonsterAttack, scaleDamageFormula } from '../utils/monsterScaling';
 
 export interface SpawnableEntity {
   id: string;
@@ -50,6 +51,7 @@ interface TokenSpawnerDrawerProps {
   onRemoveToken?: (tokenId: string) => void;
   onClearCategory?: (category: 'monsters' | 'npcs' | 'all') => void;
   onUpdateTokenHp?: (tokenId: string, delta: number) => void;
+  partySize?: number;
 }
 
 type TabType = 'all' | 'monsters' | 'characters' | 'npcs' | 'custom' | 'active';
@@ -62,6 +64,7 @@ export const TokenSpawnerDrawer: React.FC<TokenSpawnerDrawerProps> = ({
   onRemoveToken,
   onClearCategory,
   onUpdateTokenHp,
+  partySize = 1,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -194,6 +197,22 @@ export const TokenSpawnerDrawer: React.FC<TokenSpawnerDrawerProps> = ({
 
   // Handle spawn action
   const handleSpawn = (item: SpawnableEntity, count: number = 1) => {
+    const isMonster = item.type === 'monster' || (item.type === 'npc' && item.role === 'Hostile');
+    const effectivePartySize = Math.max(1, Math.min(4, Math.floor(partySize || 1)));
+    const tokenMaxHp = isMonster ? scaleMonsterHp(item.hp, effectivePartySize) : item.maxHp;
+    const tokenCurrentHp = tokenMaxHp;
+
+    const originalMonster = MONSTERS.find((m) => m.id === item.id);
+    const originalNpc = NPCS.find((n) => n.id === item.id);
+    const rawAttacks = originalMonster?.attacks || (originalNpc?.attacks ? originalNpc.attacks.map((a) => ({
+      name: a.name,
+      bonus: a.bonus,
+      damage: a.damage,
+      damageType: 'damageType' in a ? (a as any).damageType : 'Physical',
+      description: a.description,
+    })) : undefined);
+    const scaledAttacks = isMonster && rawAttacks ? rawAttacks.map((a) => scaleMonsterAttack(a, effectivePartySize)) : undefined;
+
     for (let i = 0; i < count; i++) {
       // Fan out slightly around center
       const offsetX = (Math.random() - 0.5) * 16;
@@ -203,12 +222,16 @@ export const TokenSpawnerDrawer: React.FC<TokenSpawnerDrawerProps> = ({
         id: `token-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
         name: count > 1 ? `${item.name} #${i + 1}` : item.name,
         school: item.type === 'witcher' ? (item.category.replace('School of the ', '') as any) : undefined,
-        isMonster: item.type === 'monster' || (item.type === 'npc' && item.role === 'Hostile'),
+        isMonster,
         avatarUrl: item.avatarUrl,
         x: Math.max(10, Math.min(90, 48 + offsetX)),
         y: Math.max(15, Math.min(85, 45 + offsetY)),
-        currentHp: item.hp,
-        maxHp: item.maxHp,
+        baseMaxHp: item.hp,
+        currentHp: tokenCurrentHp,
+        maxHp: tokenMaxHp,
+        scaledPartySize: isMonster ? effectivePartySize : undefined,
+        attacks: scaledAttacks,
+        monsterId: item.id,
         color: item.color,
         isHiddenFromPlayers: spawnHidden,
         ac: item.ac,
@@ -225,6 +248,9 @@ export const TokenSpawnerDrawer: React.FC<TokenSpawnerDrawerProps> = ({
   const handleSpawnCustom = () => {
     if (!customName.trim()) return;
 
+    const effectivePartySize = Math.max(1, Math.min(4, Math.floor(partySize || 1)));
+    const tokenMaxHp = customIsMonster ? scaleMonsterHp(customHp, effectivePartySize) : customHp;
+
     const newToken: MapToken = {
       id: `token-custom-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       name: customName.trim(),
@@ -232,8 +258,10 @@ export const TokenSpawnerDrawer: React.FC<TokenSpawnerDrawerProps> = ({
       avatarUrl: customAvatar,
       x: 48 + (Math.random() - 0.5) * 10,
       y: 45 + (Math.random() - 0.5) * 10,
-      currentHp: customHp,
-      maxHp: customHp,
+      baseMaxHp: customHp,
+      currentHp: tokenMaxHp,
+      maxHp: tokenMaxHp,
+      scaledPartySize: customIsMonster ? effectivePartySize : undefined,
       color: customColor,
       isHiddenFromPlayers: spawnHidden,
       ac: customAc,
@@ -715,25 +743,37 @@ export const TokenSpawnerDrawer: React.FC<TokenSpawnerDrawerProps> = ({
                             </p>
 
                             {/* Stat Badges */}
-                            <div className="flex items-center gap-2.5 text-[11px] font-mono mt-1 text-[#a0aab4]">
-                              <span className="text-emerald-400 flex items-center gap-1 font-bold">
-                                <Heart className="w-3 h-3" />
-                                {item.hp} HP
-                              </span>
-                              <span>•</span>
-                              <span className="text-amber-300 flex items-center gap-1">
-                                <Shield className="w-3 h-3" />
-                                AC {item.ac}
-                              </span>
-                              <span>•</span>
-                              <span className="text-[#8a929a]">{item.speed}</span>
-                              {item.cr && (
-                                <>
+                            {(() => {
+                              const isMonster = item.type === 'monster' || (item.type === 'npc' && item.role === 'Hostile');
+                              const effectivePartySize = Math.max(1, Math.min(4, Math.floor(partySize || 1)));
+                              const displayHp = isMonster ? scaleMonsterHp(item.hp, effectivePartySize) : item.hp;
+                              return (
+                                <div className="flex items-center gap-2.5 text-[11px] font-mono mt-1 text-[#a0aab4]">
+                                  <span className="text-emerald-400 flex items-center gap-1 font-bold">
+                                    <Heart className="w-3 h-3" />
+                                    {displayHp} HP
+                                    {isMonster && effectivePartySize > 1 && (
+                                      <span className="text-[10px] text-amber-300 font-normal">
+                                        ({effectivePartySize}p scaled)
+                                      </span>
+                                    )}
+                                  </span>
                                   <span>•</span>
-                                  <span className="text-purple-300">{item.cr}</span>
-                                </>
-                              )}
-                            </div>
+                                  <span className="text-amber-300 flex items-center gap-1">
+                                    <Shield className="w-3 h-3" />
+                                    AC {item.ac}
+                                  </span>
+                                  <span>•</span>
+                                  <span className="text-[#8a929a]">{item.speed}</span>
+                                  {item.cr && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="text-purple-300">{item.cr}</span>
+                                    </>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
 
@@ -800,18 +840,23 @@ export const TokenSpawnerDrawer: React.FC<TokenSpawnerDrawerProps> = ({
                                 Actions & Attacks:
                               </div>
                               <div className="grid grid-cols-1 gap-1.5">
-                                {item.attacks.map((att, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="p-2 rounded bg-[#15171a] border border-[#252b31] flex flex-col justify-between"
-                                  >
-                                    <div className="flex items-center justify-between gap-2">
-                                      <span className="font-cinzel font-bold text-white text-xs">{att.name}</span>
-                                      <span className="font-mono text-sky-300 text-xs">{att.damage}</span>
+                                {item.attacks.map((att, idx) => {
+                                  const isMonster = item.type === 'monster' || (item.type === 'npc' && item.role === 'Hostile');
+                                  const effectivePartySize = Math.max(1, Math.min(4, Math.floor(partySize || 1)));
+                                  const displayDamage = isMonster ? scaleDamageFormula(att.damage, (effectivePartySize - 1) * 2) : att.damage;
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className="p-2 rounded bg-[#15171a] border border-[#252b31] flex flex-col justify-between"
+                                    >
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="font-cinzel font-bold text-white text-xs">{att.name}</span>
+                                        <span className="font-mono text-sky-300 text-xs">{displayDamage}</span>
+                                      </div>
+                                      <p className="text-[11px] text-[#8a929a] mt-0.5">{att.description}</p>
                                     </div>
-                                    <p className="text-[11px] text-[#8a929a] mt-0.5">{att.description}</p>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </div>
                           )}

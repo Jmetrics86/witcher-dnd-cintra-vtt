@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Navbar } from './components/Navbar';
 import { TacticalMap } from './components/TacticalMap';
 import { CharacterSheet } from './components/CharacterSheet';
@@ -14,6 +14,7 @@ import { InstructionsModal } from './components/InstructionsModal';
 import { DMInventoryModal } from './components/DMInventoryModal';
 import { storageService, CampaignSaveState } from './services/storageService';
 import { getAssetUrl } from './utils/assets';
+import { getActivePartySize, rescaleMonsterTokens, scaleMonsterHp, scaleMonsterAttack } from './utils/monsterScaling';
 
 import { 
   WitcherCharacter, 
@@ -32,6 +33,7 @@ import {
   GameItem,
 } from './types';
 import { PREGEN_WITCHERS } from './data/characters';
+import { MONSTERS } from './data/monsters';
 import { INITIAL_ECONOMY_STATE, DEFAULT_ACT_MERCHANTS } from './data/items';
 import { MAP_SCENES } from './data/maps';
 import { p2pManager, ConnectedPeerInfo } from './services/peerService';
@@ -235,6 +237,40 @@ export const App: React.FC = () => {
       },
     };
   });
+
+  // Dynamic Witcher Party Size (1 to 4) based on locked claims and connected players
+  const partySize = useMemo(
+    () => getActivePartySize(characterAssignments, connectedPeers, isConnected, gmPlaysWitcher),
+    [characterAssignments, connectedPeers, isConnected, gmPlaysWitcher]
+  );
+
+  // Dynamic monster token rescaling when partySize changes
+  useEffect(() => {
+    if (!hasGmControls) return;
+    setTokens((prev) => {
+      const rescaled = rescaleMonsterTokens(prev, partySize);
+      const hasChanged = rescaled.some((t, i) => {
+        const old = prev[i];
+        return (
+          !old ||
+          old.maxHp !== t.maxHp ||
+          old.currentHp !== t.currentHp ||
+          old.scaledPartySize !== t.scaledPartySize
+        );
+      });
+      if (!hasChanged) return prev;
+      if (isConnected && isHost) {
+        p2pManager.send({
+          type: 'SYNC_STATE',
+          senderId: 'gm',
+          senderName: 'Game Master',
+          payload: { tokens: rescaled },
+          timestamp: Date.now(),
+        });
+      }
+      return rescaled;
+    });
+  }, [partySize, hasGmControls, isConnected, isHost]);
 
   // Active Story Visualization Overlay (Replaces battle map when shown to players)
   const [activeStoryVisual, setActiveStoryVisual] = useState<StoryVisualOverlay | null>(() => {
@@ -2043,6 +2079,12 @@ export const App: React.FC = () => {
   // Spawn monster from Bestiary modal
   const handleSpawnFromBestiary = (monster: Monster) => {
     if (!hasGmControls) return;
+    const original = MONSTERS.find((m) => m.id === monster.id);
+    const baseHp = original ? original.hp : monster.hp;
+    const scaledHp = scaleMonsterHp(baseHp, partySize);
+    const rawAttacks = original ? original.attacks : monster.attacks;
+    const scaledAttacks = rawAttacks?.map((a) => scaleMonsterAttack(a, partySize));
+
     const newToken: MapToken = {
       id: `mon-${Date.now()}`,
       name: monster.name,
@@ -2050,8 +2092,16 @@ export const App: React.FC = () => {
       avatarUrl: monster.imageUrl,
       x: 50,
       y: 50,
-      currentHp: monster.hp,
-      maxHp: monster.maxHp,
+      baseMaxHp: baseHp,
+      currentHp: scaledHp,
+      maxHp: scaledHp,
+      scaledPartySize: partySize,
+      attacks: scaledAttacks,
+      monsterId: monster.id,
+      ac: monster.ac,
+      category: monster.category,
+      title: monster.title,
+      tokenType: 'monster',
       color: '#ef4444',
     };
     handleTokenAdd(newToken);
@@ -2238,6 +2288,7 @@ export const App: React.FC = () => {
                 actMerchants={economyState.actMerchants}
                 partyCharacters={partyCharacters}
                 onBuyMerchantItem={handleMerchantPurchase}
+                partySize={partySize}
               />
             </div>
 
@@ -2276,6 +2327,7 @@ export const App: React.FC = () => {
               onClose={() => setActiveTab('map')}
               onSpawnMonster={handleSpawnFromBestiary}
               isHost={hasGmControls}
+              partySize={partySize}
             />
           </div>
         )}
@@ -2360,6 +2412,7 @@ export const App: React.FC = () => {
         onClose={() => setIsBestiaryModalOpen(false)}
         onSpawnMonster={handleSpawnFromBestiary}
         isHost={hasGmControls}
+        partySize={partySize}
       />
 
       {/* Adventure Guide Modal (Overlay - GM Only) */}
