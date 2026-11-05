@@ -171,20 +171,22 @@ export const Navbar: React.FC<NavbarProps> = ({
                   Adventure & Campaign Guides
                 </div>
 
-                {/* 4hr Module */}
-                <button
-                  onClick={() => {
-                    setIsCompendiumOpen(false);
-                    onOpenGuideModal();
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-xs font-cinzel text-[#d6d9dc] hover:text-white hover:bg-[#1e2329] transition-colors group"
-                >
-                  <Scroll className="w-4 h-4 text-amber-400 shrink-0 group-hover:scale-110 transition-transform" />
-                  <div>
-                    <div className="font-bold text-white group-hover:text-[#e2ba6d]">4-Hour Adventure Module</div>
-                    <div className="text-[10px] text-[#78828c] font-mono">The Blood of Marnadal (Acts I–IV)</div>
-                  </div>
-                </button>
+                {/* 4hr Module (GM Only - Locked for Players) */}
+                {isHost && (
+                  <button
+                    onClick={() => {
+                      setIsCompendiumOpen(false);
+                      onOpenGuideModal();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-xs font-cinzel text-[#d6d9dc] hover:text-white hover:bg-[#1e2329] transition-colors group"
+                  >
+                    <Scroll className="w-4 h-4 text-amber-400 shrink-0 group-hover:scale-110 transition-transform" />
+                    <div>
+                      <div className="font-bold text-white group-hover:text-[#e2ba6d]">4-Hour Adventure Module</div>
+                      <div className="text-[10px] text-[#78828c] font-mono">The Blood of Marnadal (Acts I–IV)</div>
+                    </div>
+                  </button>
+                )}
 
                 {/* Bestiary */}
                 <button

@@ -14,12 +14,14 @@ import {
   Skull,
   GripHorizontal,
   Lock,
-  RotateCcw
+  RotateCcw,
+  ShoppingBag
 } from 'lucide-react';
-import { MapScene, MapToken, WitcherCharacter, StoryVisualOverlay, WitcherSchool } from '../types';
+import { MapScene, MapToken, WitcherCharacter, StoryVisualOverlay, WitcherSchool, ActMerchant } from '../types';
 import { MAP_SCENES } from '../data/maps';
 import { WITCHER_ADVENTURE } from '../data/adventure';
 import { TokenSpawnerDrawer } from './TokenSpawnerDrawer';
+import { MerchantStoreViewer } from './MerchantStoreViewer';
 
 interface TacticalMapProps {
   currentScene: MapScene;
@@ -39,6 +41,11 @@ interface TacticalMapProps {
   activeStoryVisual?: StoryVisualOverlay | null;
   onShowStoryVisual?: (visual: StoryVisualOverlay | null) => void;
   onOpenWitcherSheet?: (school: WitcherSchool) => void;
+  activeStoreAct?: number | null;
+  onShowStore?: (actNum: number | null) => void;
+  actMerchants?: Record<number, ActMerchant>;
+  partyCharacters?: WitcherCharacter[] | Record<string, WitcherCharacter>;
+  onBuyMerchantItem?: (buyerSchool: WitcherSchool, actNum: number, itemId: string) => void;
 }
 
 export const TacticalMap: React.FC<TacticalMapProps> = ({
@@ -59,6 +66,11 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
   activeStoryVisual = null,
   onShowStoryVisual,
   onOpenWitcherSheet,
+  activeStoreAct = null,
+  onShowStore,
+  actMerchants,
+  partyCharacters,
+  onBuyMerchantItem,
 }) => {
   const [showGrid, setShowGrid] = useState(true);
   const [activeTool, setActiveTool] = useState<'move' | 'ping'>('move');
@@ -73,10 +85,16 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
   const [isDraggingHud, setIsDraggingHud] = useState(false);
   const dragStartRef = useRef<{ mouseX: number; mouseY: number; startX: number; startY: number } | null>(null);
 
-  // Find corresponding Act Story Visual for quick toggle
-  const currentActStoryVisual = WITCHER_ADVENTURE.acts.find(
+  // Find corresponding Act Story Visuals for quick toggle (including roleplay environments like the tavern)
+  const currentActStoryVisuals = WITCHER_ADVENTURE.acts.find(
     (act) => act.act === currentScene.actNumber
-  )?.storyVisuals?.[0];
+  )?.storyVisuals || [];
+
+  // Primary Act Scenes vs Interior Sub-Structure Scenes
+  const primaryScenes = MAP_SCENES.filter((s) => !s.isStructure);
+  const currentActScenes = MAP_SCENES.filter((s) => s.actNumber === currentScene.actNumber);
+  const primarySceneForAct = currentActScenes.find((s) => !s.isStructure);
+  const subSceneForAct = currentActScenes.find((s) => s.isStructure);
 
   const selectedToken = tokens.find((t) => t.id === selectedTokenId);
 
@@ -200,10 +218,10 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
         {/* Act Scene Switcher (Compact Segmented Pills) */}
         <div className="flex items-center gap-2">
           <div className="flex items-center bg-[#121416] p-0.5 rounded-lg border border-[#282e35]">
-            {MAP_SCENES.map((scene) => {
+            {primaryScenes.map((scene) => {
               const romans = ['I', 'II', 'III', 'IV'];
               const roman = romans[scene.actNumber - 1] || `${scene.actNumber}`;
-              const isCurrent = currentScene.id === scene.id;
+              const isCurrent = currentScene.actNumber === scene.actNumber;
               return (
                 <button
                   key={scene.id}
@@ -231,6 +249,52 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
               );
             })}
           </div>
+
+          {/* Main Map vs Sub-Structure Switcher for Unexpected Combat */}
+          {subSceneForAct && (
+            <div className="flex items-center bg-[#121416] p-0.5 rounded-lg border border-[#282e35]">
+              <button
+                type="button"
+                onClick={() => {
+                  if (isHost && primarySceneForAct) onSceneChange(primarySceneForAct);
+                }}
+                disabled={!isHost}
+                className={`px-2 py-0.5 text-xs font-cinzel rounded transition-all ${
+                  !currentScene.isStructure
+                    ? 'bg-[#293038] text-white font-bold shadow-sm'
+                    : isHost
+                    ? 'text-[#8a929a] hover:text-white'
+                    : 'text-[#505760] cursor-default'
+                }`}
+                title="Primary Open Battle Map"
+              >
+                Main Map
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (isHost && subSceneForAct) onSceneChange(subSceneForAct);
+                }}
+                disabled={!isHost}
+                className={`px-2 py-0.5 text-xs font-cinzel rounded transition-all flex items-center gap-1 ${
+                  currentScene.isStructure
+                    ? 'bg-amber-600/30 text-amber-300 font-bold border border-amber-500/40 shadow-sm'
+                    : isHost
+                    ? 'text-[#8a929a] hover:text-white'
+                    : 'text-[#505760] cursor-default'
+                }`}
+                title={
+                  isHost
+                    ? `Switch to tactical sub-structure: ${subSceneForAct.structureName}`
+                    : `Current interior: ${subSceneForAct.structureName}`
+                }
+              >
+                <span>🏰</span>
+                <span className="hidden sm:inline">{subSceneForAct.structureName}</span>
+                <span className="sm:hidden">Structure</span>
+              </button>
+            </div>
+          )}
 
           <div className="hidden md:flex items-center gap-1.5 text-xs text-[#8a929a]">
             <span className="text-[#3a444e]">•</span>
@@ -280,7 +344,30 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
             <Grid className="w-4 h-4" />
           </button>
 
-          {/* Story Art Toggle (GM Only) */}
+          {/* Push Waystation Store Toggle (GM Only) */}
+          {isHost && onShowStore && (
+            activeStoreAct ? (
+              <button
+                onClick={() => onShowStore(null)}
+                className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-black font-cinzel font-bold text-xs flex items-center gap-1 shadow-sm transition-all"
+                title="Close Store and Return to Battle Map"
+              >
+                <MapIcon className="w-3.5 h-3.5" />
+                <span>Map View</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => onShowStore(currentScene.actNumber)}
+                className="px-2.5 py-1 rounded-lg bg-[#16181b] hover:bg-[#20252b] border border-[#2b3137] text-amber-300 hover:text-amber-200 font-cinzel text-xs flex items-center gap-1 transition-all"
+                title={`Push Act ${currentScene.actNumber} Waystation Store to the Battle Map area`}
+              >
+                <ShoppingBag className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">Push Store</span>
+              </button>
+            )
+          )}
+
+          {/* Story Art & Roleplay Environments (GM Only) */}
           {isHost && onShowStoryVisual && (
             activeStoryVisual ? (
               <button
@@ -291,15 +378,22 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
                 <MapIcon className="w-3.5 h-3.5" />
                 <span>Map View</span>
               </button>
-            ) : currentActStoryVisual ? (
-              <button
-                onClick={() => onShowStoryVisual(currentActStoryVisual)}
-                className="px-2.5 py-1 rounded-lg bg-[#16181b] hover:bg-[#20252b] border border-[#2b3137] text-[#c99a45] hover:text-[#e2ba6d] font-cinzel text-xs flex items-center gap-1 transition-all"
-                title={`Show Act ${currentScene.actNumber} Story Scene Artwork`}
-              >
-                <ImageIcon className="w-3.5 h-3.5 text-[#c99a45]" />
-                <span className="hidden sm:inline">Story Art</span>
-              </button>
+            ) : currentActStoryVisuals.length > 0 ? (
+              <div className="flex items-center gap-1">
+                {currentActStoryVisuals.map((vis) => (
+                  <button
+                    key={vis.id}
+                    onClick={() => onShowStoryVisual(vis)}
+                    className="px-2 py-1 rounded-lg bg-[#16181b] hover:bg-[#20252b] border border-[#2b3137] text-[#c99a45] hover:text-[#e2ba6d] font-cinzel text-xs flex items-center gap-1 transition-all"
+                    title={`Push "${vis.title}" to Table Viewing Area`}
+                  >
+                    <ImageIcon className="w-3.5 h-3.5 text-[#c99a45]" />
+                    <span className="hidden sm:inline">
+                      {vis.category === 'tavern' ? 'Tavern Photo' : 'Story Scene'}
+                    </span>
+                  </button>
+                ))}
+              </div>
             ) : null
           )}
 
@@ -321,9 +415,23 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
 
       </div>
 
-      {/* Main Interactive Map Canvas OR Story Visualization Theater */}
+      {/* Main Interactive Map Canvas OR Store Viewer OR Story Visualization Theater */}
       <div className="relative flex-1 min-h-0 bg-[#0a0b0c] overflow-hidden select-none min-w-0">
-        {activeStoryVisual ? (
+        {activeStoreAct ? (
+          /* ACTIVE MERCHANT STORE THEATER (PUSHED BY GM) */
+          <MerchantStoreViewer
+            actNumber={activeStoreAct}
+            actMerchants={actMerchants}
+            isHost={isHost}
+            selectedCharacter={selectedCharacter}
+            partyCharacters={partyCharacters}
+            onCloseStore={() => onShowStore?.(null)}
+            onSelectActStore={(actNum) => onShowStore?.(actNum)}
+            onBuyItem={(buyerSchool, actNum, itemId) => {
+              if (onBuyMerchantItem) onBuyMerchantItem(buyerSchool, actNum, itemId);
+            }}
+          />
+        ) : activeStoryVisual ? (
           /* STORY VISUALIZATION VIEW */
           <div className="relative w-full h-full flex flex-col justify-between overflow-hidden bg-black">
             <img

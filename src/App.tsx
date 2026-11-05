@@ -241,6 +241,9 @@ export const App: React.FC = () => {
     return initialSave?.activeStoryVisual || null;
   });
 
+  // Active Waystation Store Overlay (Replaces battle map when pushed to players by GM)
+  const [activeStoreAct, setActiveStoreAct] = useState<number | null>(null);
+
   // Party Cause & Effect Choices across Acts I-IV + Epilogue
   const [partyChoices, setPartyChoices] = useState<Record<string, PartyChoiceRecord>>(() => {
     return initialSave?.partyChoices || {};
@@ -261,6 +264,7 @@ export const App: React.FC = () => {
     economyState,
     characterAssignments,
     activeStoryVisual,
+    activeStoreAct,
     partyChoices,
     completedSpotlights,
     isHost,
@@ -275,11 +279,12 @@ export const App: React.FC = () => {
       economyState,
       characterAssignments,
       activeStoryVisual,
+      activeStoreAct,
       partyChoices,
       completedSpotlights,
       isHost,
     };
-  }, [currentScene, tokens, messages, selectedCharacter, partyCharacters, economyState, characterAssignments, activeStoryVisual, partyChoices, completedSpotlights, isHost]);
+  }, [currentScene, tokens, messages, selectedCharacter, partyCharacters, economyState, characterAssignments, activeStoryVisual, activeStoreAct, partyChoices, completedSpotlights, isHost]);
 
   // Auto-save to Game Master's browser local storage
   useEffect(() => {
@@ -606,6 +611,7 @@ export const App: React.FC = () => {
               selectedCharacterId: gameStateRef.current.selectedCharacter.id,
               characterAssignments: gameStateRef.current.characterAssignments,
               activeStoryVisual: gameStateRef.current.activeStoryVisual,
+              activeStoreAct: gameStateRef.current.activeStoreAct,
               partyChoices: gameStateRef.current.partyChoices,
               gmPlaysWitcher: p2pManager.hostPlaysWitcher,
               connectedPeers: p2pManager.getConnectedPeers(),
@@ -630,6 +636,9 @@ export const App: React.FC = () => {
         }
         if (packet.payload.activeStoryVisual !== undefined) {
           setActiveStoryVisual(packet.payload.activeStoryVisual);
+        }
+        if (packet.payload.activeStoreAct !== undefined) {
+          setActiveStoreAct(packet.payload.activeStoreAct);
         }
         if (packet.payload.partyChoices) {
           setPartyChoices(packet.payload.partyChoices);
@@ -779,8 +788,23 @@ export const App: React.FC = () => {
         break;
 
       case 'STORY_VISUAL_SYNC':
-        setActiveStoryVisual(packet.payload || null);
+      case 'SHOW_STORY_VISUAL': {
+        const visual = packet.payload?.visual !== undefined ? packet.payload.visual : packet.payload || null;
+        setActiveStoryVisual(visual);
+        if (visual) {
+          setActiveStoreAct(null);
+        }
         break;
+      }
+
+      case 'SHOW_MERCHANT_STORE': {
+        const actNum = packet.payload?.actNumber ?? null;
+        setActiveStoreAct(actNum);
+        if (actNum !== null) {
+          setActiveStoryVisual(null);
+        }
+        break;
+      }
 
       case 'PARTY_CHOICES_SYNC':
         if (packet.payload) {
@@ -1771,6 +1795,9 @@ export const App: React.FC = () => {
   const handleShowStoryVisual = (visual: StoryVisualOverlay | null) => {
     if (!hasGmControls) return;
     setActiveStoryVisual(visual);
+    if (visual !== null) {
+      setActiveStoreAct(null);
+    }
 
     p2pManager.send({
       type: 'STORY_VISUAL_SYNC',
@@ -1800,6 +1827,47 @@ export const App: React.FC = () => {
       });
     } else {
       handleAddLogMessage('Returned view from Story Visualization to Tactical Battle Map.', 'system');
+    }
+  };
+
+  // Show or Clear Merchant Store in Battle Map Area (Pushed to all screens by GM)
+  const handleShowStore = (actNum: number | null) => {
+    if (!hasGmControls) return;
+    setActiveStoreAct(actNum);
+    if (actNum !== null) {
+      setActiveStoryVisual(null);
+    }
+
+    p2pManager.send({
+      type: 'SHOW_MERCHANT_STORE',
+      senderId: 'gm',
+      senderName: 'Game Master',
+      payload: { actNumber: actNum },
+      timestamp: Date.now(),
+    });
+
+    if (actNum !== null) {
+      const merchant = economyState.actMerchants?.[actNum] || DEFAULT_ACT_MERCHANTS[actNum];
+      const merchantName = merchant ? merchant.name : `Act ${actNum} Merchant`;
+      const msg: ChatMessage = {
+        id: `store-${Date.now()}`,
+        senderId: 'gm',
+        senderName: 'Game Master',
+        isDM: true,
+        type: 'lore',
+        text: `🛒 [Waystation Store Opened] The Game Master has pushed ${merchantName}'s shop to the battle map viewing area!`,
+        timestamp: Date.now(),
+      };
+      setMessages((prev) => [...prev, msg]);
+      p2pManager.send({
+        type: 'CHAT_MESSAGE',
+        senderId: 'gm',
+        senderName: 'Game Master',
+        payload: msg,
+        timestamp: Date.now(),
+      });
+    } else {
+      handleAddLogMessage('Closed Waystation Store; table returned to tactical battle map', 'system');
     }
   };
 
@@ -2165,6 +2233,11 @@ export const App: React.FC = () => {
                 activeStoryVisual={activeStoryVisual}
                 onShowStoryVisual={handleShowStoryVisual}
                 onOpenWitcherSheet={handleOpenWitcherSheet}
+                activeStoreAct={activeStoreAct}
+                onShowStore={handleShowStore}
+                actMerchants={economyState.actMerchants}
+                partyCharacters={partyCharacters}
+                onBuyMerchantItem={handleMerchantPurchase}
               />
             </div>
 
@@ -2207,8 +2280,8 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {/* VIEW 4: INLINE ADVENTURE GUIDE */}
-        {activeTab === 'guide' && (
+        {/* VIEW 4: INLINE ADVENTURE GUIDE (GM Only) */}
+        {activeTab === 'guide' && hasGmControls && (
           <div className="flex-1">
             <AdventureGuideModal
               isOpen={true}
@@ -2225,6 +2298,7 @@ export const App: React.FC = () => {
               actMerchants={economyState.actMerchants}
               onBuyMerchantItem={handleMerchantPurchase}
               currentShopperSchool={selectedCharacter.school}
+              onShowStore={handleShowStore}
             />
           </div>
         )}
@@ -2288,9 +2362,9 @@ export const App: React.FC = () => {
         isHost={hasGmControls}
       />
 
-      {/* Adventure Guide Modal (Overlay) */}
+      {/* Adventure Guide Modal (Overlay - GM Only) */}
       <AdventureGuideModal
-        isOpen={isGuideModalOpen}
+        isOpen={isGuideModalOpen && hasGmControls}
         onClose={() => setIsGuideModalOpen(false)}
         activeStoryVisual={activeStoryVisual}
         onShowStoryVisual={handleShowStoryVisual}
@@ -2304,6 +2378,7 @@ export const App: React.FC = () => {
         actMerchants={economyState.actMerchants}
         onBuyMerchantItem={handleMerchantPurchase}
         currentShopperSchool={selectedCharacter.school}
+        onShowStore={handleShowStore}
       />
 
       {/* How to Play & GM Instructions Modal */}
@@ -2311,7 +2386,7 @@ export const App: React.FC = () => {
         isOpen={isInstructionsModalOpen}
         onClose={() => setIsInstructionsModalOpen(false)}
         onOpenP2P={() => setIsP2PModalOpen(true)}
-        onOpenGuide={() => setIsGuideModalOpen(true)}
+        onOpenGuide={() => hasGmControls && setIsGuideModalOpen(true)}
         onOpenGMModal={() => setIsGMModalOpen(true)}
         onOpenNotionModal={() => setIsNotionModalOpen(true)}
         isHost={hasGmControls}

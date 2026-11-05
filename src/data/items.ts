@@ -817,7 +817,7 @@ export const DEFAULT_ACT_MERCHANTS: Record<number, ActMerchant> = {
     name: 'Master Torvin Ironfoot',
     title: 'Mahakaman Traveling Dwarven Smith & Waystation Quartermaster',
     location: 'Lion & Lily Tavern Courtyard, Sodden Crossroads',
-    avatarUrl: getAssetUrl('assets/tokens/torvin_smith.jpg'),
+    avatarUrl: getAssetUrl('assets/merchants/torvin_smith.jpg'),
     greeting: 'Looking for dependable Mahakaman steel or field supplies before braving the mist? Torvin\'s forge doesn\'t sell junk. Hard orens buy hard steel.',
     lore: 'A veteran clan smith from Mount Carbon who contracts with traveling mercenaries and Cintrian rangers. He carries field-tested armor, balanced blades, and fresh alchemical concoctions brewed by local hedge-witches.',
     items: [
@@ -876,7 +876,7 @@ export const DEFAULT_ACT_MERCHANTS: Record<number, ActMerchant> = {
     name: 'Herbalist Maeve & Caravan Survivor Yann',
     title: 'Blackwood Forager & Refugee Provisioners',
     location: 'Perimeter of the Ambushed Convoy, Blackwood Verges',
-    avatarUrl: getAssetUrl('assets/tokens/herbalist_maeve.jpg'),
+    avatarUrl: getAssetUrl('assets/merchants/herbalist_maeve.jpg'),
     greeting: 'The primeval forest has turned hostile, Witcher. The sap smells of old blood and copper. If you mean to follow Sir Danek\'s bloody tracks to the barrows, take these specter oils and silver.',
     lore: 'Maeve survived the caravan ambush by hiding in a hollow elder-willow. With Yann\'s help, she gathered salvage from the intact wagons and foraged rare barrow-lichens before the rotfiends could feast.',
     items: [
@@ -935,7 +935,7 @@ export const DEFAULT_ACT_MERCHANTS: Record<number, ActMerchant> = {
     name: '"Blind" Lucian',
     title: 'Black Market Antiquities Smuggler & Barrow Delver',
     location: 'Hidden Excavation Trench behind the Barrow of Elidyr',
-    avatarUrl: getAssetUrl('assets/tokens/smuggler_lucian.jpg'),
+    avatarUrl: getAssetUrl('assets/merchants/smuggler_lucian.jpg'),
     greeting: 'Speak low, mutant. The barrow wraiths listen through the limestone. Danek\'s knights thought they could rob Queen Calanthe\'s heritage, but they left in terror. I only trade in hard orens.',
     lore: 'A ruthless antiquities fence operating from the forgotten military saps beneath the burial mounds. He has unearthed relics of ancient Tir ná Lia and contraband concoctions forbidden in Cintrian cities.',
     items: [
@@ -994,7 +994,7 @@ export const DEFAULT_ACT_MERCHANTS: Record<number, ActMerchant> = {
     name: 'Sergeant Verek of the Blue Banner',
     title: 'Cintrian Vanguard Quartermaster & Siege Engineer',
     location: 'Forward Entrenchment Camp, Primeval Heart-Tree Verges',
-    avatarUrl: getAssetUrl('assets/tokens/quartermaster_verek.jpg'),
+    avatarUrl: getAssetUrl('assets/merchants/quartermaster_verek.jpg'),
     greeting: 'By Queen Calanthe\'s decree, all military stores are opened for the witcher contract. The Leshen has swallowed two of our scout patrols. Take our royal half-plate and silver before the branches close around us.',
     lore: 'Sergeant Verek commands the last surviving royal supply wagon fortifying the outer perimeter of the Heart-Tree grove. His stocks feature Cintrian palace armaments and high-potency witcher supplies requisitioned for the queen\'s marshals.',
     items: [

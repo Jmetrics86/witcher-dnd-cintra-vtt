@@ -2,6 +2,7 @@ import { MapScene } from '../types';
 import { getAssetUrl } from '../utils/assets';
 
 export const MAP_SCENES: MapScene[] = [
+  // ACT I
   {
     id: 'scene-tavern',
     actNumber: 1,
@@ -12,7 +13,24 @@ export const MAP_SCENES: MapScene[] = [
     gridRows: 16,
     gridCols: 20,
     gmNotes: 'Act I GM Guide: Start in media res. Have Baron Raymond of Marnadal\'s bailiff, Sir Danek, enter surrounded by four Cintrian guards. 2,000 Cintrian orens offered for the head of "The Woodland Shadow" slaughtering logging convoys near the Yaruga. Let the 4 Witchers size each other up, negotiate the split of the coin, and handle a drunken Cintrian knight who spits on the floor near them.',
+    isStructure: false,
   },
+  {
+    id: 'scene-tavern-cellar',
+    actNumber: 1,
+    name: 'Waystation Cellar & Vault',
+    subtitle: 'Act I Structure: Smuggler Cellar & Ale Store',
+    description: 'The damp vaulted cellar beneath the Lion & Lily tavern. Heavy oak casks of Mahakaman ale, grain sacks, and smuggler weapon crates line the stone walls. Cobwebs cling to overhead timbers and a ladder leads to the tavern trapdoor above.',
+    imageUrl: getAssetUrl('assets/maps/map_tavern_cellar.jpg'),
+    gridRows: 14,
+    gridCols: 18,
+    gmNotes: 'Tactical Sub-Structure Map: Ideal if tavern brawls spill underground, if players investigate contraband crates, or if Sir Danek corners a rogue witcher by the wine casks.',
+    isStructure: true,
+    structureName: 'Cellar & Pantry',
+    parentSceneId: 'scene-tavern',
+  },
+
+  // ACT II
   {
     id: 'scene-forest',
     actNumber: 2,
@@ -23,7 +41,24 @@ export const MAP_SCENES: MapScene[] = [
     gridRows: 16,
     gridCols: 20,
     gmNotes: 'Act II GM Guide: Witcher Senses skill checks (DC 13). Discover gouged tree bark 10 feet in the air (Chort horns), raven feathers soaked in green ichor (Leshen presence), and freshly dug shallow graves. Combat ambush: A pack of 4 Barghest hounds materialized from the mist. Introduce Yrden & Moon Dust bomb mechanics to pin the specters.',
+    isStructure: false,
   },
+  {
+    id: 'scene-wood-cabin',
+    actNumber: 2,
+    name: 'Woodsman\'s Secluded Cabin',
+    subtitle: 'Act II Structure: Abandoned Trapper Shack',
+    description: 'A weathered timber cabin tucked deep into the Yaruga marshes. Drying wolf pelts hang on the walls, rusted bear traps dangle from rafter pegs, and rain seeps through rotting shingles. Claw marks rake the doorframe.',
+    imageUrl: getAssetUrl('assets/maps/map_wood_cabin.jpg'),
+    gridRows: 14,
+    gridCols: 18,
+    gmNotes: 'Tactical Sub-Structure Map: Use if witchers track wounded scouts to Kaelan\'s shelter, get caught in an unscripted night ambush by Barghests, or take cover from a thunderstorm.',
+    isStructure: true,
+    structureName: 'Trapper Cabin',
+    parentSceneId: 'scene-forest',
+  },
+
+  // ACT III
   {
     id: 'scene-crypt',
     actNumber: 3,
@@ -34,7 +69,24 @@ export const MAP_SCENES: MapScene[] = [
     gridRows: 16,
     gridCols: 20,
     gmNotes: 'Act III GM Guide: Dungeon exploration. Encounter the Marnadal Grave Hag crunching bones in the central ossuary. After defeating her, inspect the ancient altar (DC 14 Arcana/History - Alden excels here): Reveal the truth! The Baron lied—he didn\'t just send loggers; his men secretly desecrated the Sacred Grove to steal the Sun Stone of King Elidyr, awakening the Ancient Leshen\'s wrath.',
+    isStructure: false,
   },
+  {
+    id: 'scene-crypt-vault',
+    actNumber: 3,
+    name: 'Sunken Barrow Altar Vault',
+    subtitle: 'Act III Structure: Ancient Tomb Chamber',
+    description: 'A secluded lower sanctum beneath King Elidyr\'s barrow. Ornate elven sarcophagi line the chamber, faint blue runes shimmer upon the floor flagstones, and shattered funerary urns crunch underfoot. The air is deathly cold.',
+    imageUrl: getAssetUrl('assets/maps/map_crypt_vault.jpg'),
+    gridRows: 14,
+    gridCols: 18,
+    gmNotes: 'Tactical Sub-Structure Map: Ideal for close-quarters fighting against the Grave Hag, inspecting the secret Sun Stone altar, or cornering restless wraiths in the crypt recesses.',
+    isStructure: true,
+    structureName: 'Altar Vault',
+    parentSceneId: 'scene-crypt',
+  },
+
+  // ACT IV
   {
     id: 'scene-boss-grove',
     actNumber: 4,
@@ -45,5 +97,20 @@ export const MAP_SCENES: MapScene[] = [
     gridRows: 16,
     gridCols: 20,
     gmNotes: 'Act IV GM Guide: The Showdown! Phase 1: The Ancient Leshen commands the woodland, summoning crows and entangling vines. Phase 2: At 50% HP, the Leshen howls and the Primeval Chort thunders into the arena! The party must coordinate: Bear tanks the Chort with Quen, Cat flanks for massive crits, Griffin bombards the Leshen with Igni and Yrden, and Wolf coordinates tactical bomb strikes.',
+    isStructure: false,
+  },
+  {
+    id: 'scene-guard-outpost',
+    actNumber: 4,
+    name: 'Cintrian Vanguard Palisade',
+    subtitle: 'Act IV Structure: Forward Fortified Outpost',
+    description: 'A rain-soaked timber watchtower and spiked palisade gate erected by Cintrian engineers on the perimeter of the primeval woods. Wooden barricades, supply tents, and brazier pits stand ready against woodland horrors.',
+    imageUrl: getAssetUrl('assets/maps/map_guard_outpost.jpg'),
+    gridRows: 14,
+    gridCols: 18,
+    gmNotes: 'Tactical Sub-Structure Map: Use if the Ancient Leshen summons forest beasts to siege the forward camp, or if players confront Sergeant Verek or Sir Danek\'s retreating knights.',
+    isStructure: true,
+    structureName: 'Guard Palisade',
+    parentSceneId: 'scene-boss-grove',
   },
 ];

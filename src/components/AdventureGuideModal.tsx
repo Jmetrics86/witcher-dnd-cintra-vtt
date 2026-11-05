@@ -52,6 +52,7 @@ interface AdventureGuideModalProps {
   actMerchants?: Record<number, ActMerchant>;
   onBuyMerchantItem?: (buyerSchool: WitcherSchool, actNum: number, itemId: string) => void;
   currentShopperSchool?: WitcherSchool;
+  onShowStore?: (actNum: number | null) => void;
 }
 
 export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
@@ -69,6 +70,7 @@ export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
   actMerchants,
   onBuyMerchantItem,
   currentShopperSchool,
+  onShowStore,
 }) => {
   // Continuous scroll mode vs single act tab mode (Default: continuous scroll as requested!)
   const [viewMode, setViewMode] = useState<'continuous' | 'single'>('continuous');
@@ -676,8 +678,22 @@ export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
             </div>
           </div>
 
-          {/* Witcher Shopper Selection Buttons */}
-          <div className="bg-[#181b1f] p-2 rounded-xl border border-[#2b3138]">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Push Store to Viewing Area (Host Only) */}
+            {isHost && onShowStore && (
+              <button
+                type="button"
+                onClick={() => onShowStore(actNum)}
+                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-600/30 to-amber-700/40 hover:from-amber-600 hover:to-amber-500 border border-amber-500/50 text-amber-200 hover:text-black font-cinzel font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shrink-0"
+                title="Broadcast this merchant store to the Battle Map area for the whole party"
+              >
+                <Store className="w-4 h-4 text-amber-400" />
+                <span>Push Store to Table</span>
+              </button>
+            )}
+
+            {/* Witcher Shopper Selection Buttons */}
+            <div className="bg-[#181b1f] p-2 rounded-xl border border-[#2b3138]">
             <div className="text-[10px] font-cinzel text-[#8a929a] uppercase tracking-wider mb-1.5 flex items-center justify-between gap-2">
               <span>Customer Purse:</span>
               <span className="font-mono text-[#c99a45] font-bold">
@@ -721,6 +737,7 @@ export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
             </div>
           </div>
         </div>
+      </div>
 
         {/* Merchant Greeting & Dialogue */}
         <div className="p-3.5 rounded-xl bg-[#171a1d] border border-[#262c33] flex items-start gap-3">

@@ -215,6 +215,7 @@ export interface StoryVisualOverlay {
   subtitle: string;
   caption: string;
   imageUrl: string;
+  category?: 'story' | 'environment' | 'tavern';
 }
 
 export interface PartyChoiceRecord {
@@ -271,6 +272,9 @@ export interface MapScene {
   gridRows: number;
   gridCols: number;
   gmNotes: string;
+  isStructure?: boolean;
+  structureName?: string;
+  parentSceneId?: string;
 }
 
 export interface NPCEntity {
@@ -372,6 +376,8 @@ export interface P2PPacket {
     | 'CHARACTER_CLAIM'
     | 'CHARACTER_ASSIGNMENT_SYNC'
     | 'STORY_VISUAL_SYNC'
+    | 'SHOW_STORY_VISUAL'
+    | 'SHOW_MERCHANT_STORE'
     | 'PARTY_CHOICES_SYNC'
     | 'ECONOMY_SYNC'
     | 'MERCHANT_PURCHASE';

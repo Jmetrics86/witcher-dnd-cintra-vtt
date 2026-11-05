@@ -145,11 +145,22 @@ Suddenly, the iron latch screams as the heavy cross-timber doors bang wide again
         {
           id: 'visual-act1-tavern',
           actNumber: 1,
+          category: 'story',
           title: 'The Royal Bounty at the Lion & Lily',
           subtitle: 'Act I: Sir Danek Nails the Baron\'s Decree to the Hearth Pillar',
           caption:
             'Rain lashes the shutters of the Marnadal waystation as Royal Bailiff Sir Danek posts a 2,000-oren contract under the watchful amber eyes of four Witchers.',
           imageUrl: getAssetUrl('assets/story/act1_tavern_contract.jpg'),
+        },
+        {
+          id: 'visual-act1-common-room',
+          actNumber: 1,
+          category: 'tavern',
+          title: 'The Lion & Lily Common Room',
+          subtitle: 'Roleplay Environment: Travelers, Ale & Whispers by the Hearth',
+          caption:
+            'Warm amber firelight washes over oak trestle tables, Cintrian lion heraldry, and quiet whispers as the four witchers size each other up before taking the contract.',
+          imageUrl: getAssetUrl('assets/story/tavern_common_room.jpg'),
         },
       ],
       storyBeats: [
