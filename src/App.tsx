@@ -832,6 +832,44 @@ export const App: React.FC = () => {
     });
   };
 
+  // Update Token (e.g. HP change from spawner drawer)
+  const handleTokenUpdate = (updatedToken: MapToken) => {
+    setTokens((prev) => prev.map((t) => (t.id === updatedToken.id ? updatedToken : t)));
+
+    p2pManager.send({
+      type: 'SYNC_STATE',
+      senderId: selectedCharacter.id,
+      senderName: selectedCharacter.name,
+      payload: {
+        tokens: tokens.map((t) => (t.id === updatedToken.id ? updatedToken : t)),
+      },
+      timestamp: Date.now(),
+    });
+  };
+
+  // Bulk Clear Tokens (monsters, npcs, or all)
+  const handleClearTokens = (category: 'monsters' | 'npcs' | 'all') => {
+    let remaining = tokens;
+    if (category === 'monsters') {
+      remaining = tokens.filter((t) => !t.isMonster);
+    } else if (category === 'npcs') {
+      remaining = tokens.filter((t) => t.isMonster || !!t.school);
+    } else if (category === 'all') {
+      remaining = [];
+    }
+    setTokens(remaining);
+
+    p2pManager.send({
+      type: 'SYNC_STATE',
+      senderId: 'gm',
+      senderName: 'Game Master',
+      payload: { tokens: remaining },
+      timestamp: Date.now(),
+    });
+
+    handleAddLogMessage(`Game Master cleared ${category} tokens from the tactical battle map.`, 'system');
+  };
+
   // Change Map Scene
   const handleSceneChange = (scene: MapScene) => {
     setCurrentScene(scene);
@@ -1225,9 +1263,11 @@ export const App: React.FC = () => {
                 onTokenMove={handleTokenMove}
                 onTokenAdd={handleTokenAdd}
                 onTokenRemove={handleTokenRemove}
+                onTokenUpdate={handleTokenUpdate}
+                onClearCategory={handleClearTokens}
                 onPing={handlePing}
                 pingLocation={pingLocation}
-                isHost={isHost}
+                isHost={isHost || !isConnected}
                 selectedCharacter={selectedCharacter}
                 activeStoryVisual={activeStoryVisual}
                 onShowStoryVisual={handleShowStoryVisual}

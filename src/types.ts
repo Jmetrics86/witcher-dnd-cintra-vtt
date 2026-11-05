@@ -181,6 +181,32 @@ export interface MapScene {
   gmNotes: string;
 }
 
+export interface NPCEntity {
+  id: string;
+  name: string;
+  title: string;
+  category: 'Nobility' | 'Soldier' | 'Commoner' | 'Specter' | 'Outlaw' | 'Beast' | 'Necrophage';
+  role: 'Friendly' | 'Hostile' | 'Neutral' | 'Ally';
+  ac: number;
+  hp: number;
+  maxHp: number;
+  speed: string;
+  avatarUrl: string;
+  color: string;
+  description: string;
+  actPresence: string;
+  attacks?: {
+    name: string;
+    bonus: number;
+    damage: string;
+    description: string;
+  }[];
+  specialAbilities?: {
+    name: string;
+    description: string;
+  }[];
+}
+
 export interface MapToken {
   id: string;
   name: string;
@@ -193,6 +219,10 @@ export interface MapToken {
   maxHp: number;
   color: string;
   isHiddenFromPlayers?: boolean;
+  category?: string;
+  ac?: number;
+  title?: string;
+  tokenType?: 'monster' | 'witcher' | 'npc' | 'custom';
 }
 
 export interface DiceRollMessage {

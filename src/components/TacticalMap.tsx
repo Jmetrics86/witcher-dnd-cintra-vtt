@@ -6,20 +6,23 @@ import {
   Compass,
   Image as ImageIcon,
   Map as MapIcon,
-  EyeOff
+  EyeOff,
+  UserPlus
 } from 'lucide-react';
 import { MapScene, MapToken, WitcherCharacter, StoryVisualOverlay } from '../types';
 import { MAP_SCENES } from '../data/maps';
-import { MONSTERS } from '../data/monsters';
 import { WITCHER_ADVENTURE } from '../data/adventure';
+import { TokenSpawnerDrawer } from './TokenSpawnerDrawer';
 
 interface TacticalMapProps {
   currentScene: MapScene;
   onSceneChange: (scene: MapScene) => void;
   tokens: MapToken[];
   onTokenMove: (tokenId: string, x: number, y: number) => void;
-  onTokenAdd?: (token: MapToken) => void;
+  onTokenAdd?: (token: MapToken, count?: number) => void;
   onTokenRemove?: (tokenId: string) => void;
+  onTokenUpdate?: (updatedToken: MapToken) => void;
+  onClearCategory?: (category: 'monsters' | 'npcs' | 'all') => void;
   onPing: (x: number, y: number) => void;
   pingLocation: { x: number, y: number } | null;
   isHost: boolean;
@@ -35,6 +38,8 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
   onTokenMove,
   onTokenAdd,
   onTokenRemove,
+  onTokenUpdate,
+  onClearCategory,
   onPing,
   pingLocation,
   isHost,
@@ -45,6 +50,7 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
   const [showGrid, setShowGrid] = useState(true);
   const [activeTool, setActiveTool] = useState<'move' | 'ping'>('move');
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
+  const [isSpawnerOpen, setIsSpawnerOpen] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null);
 
   // Find corresponding Act Story Visual for quick toggle
@@ -71,23 +77,14 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
     }
   };
 
-  // Add monster token (Host GM tool)
-  const handleAddMonsterToken = (monsterId: string) => {
-    const monster = MONSTERS.find((m) => m.id === monsterId);
-    if (!monster || !onTokenAdd) return;
-
-    const newToken: MapToken = {
-      id: `token-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      name: monster.name,
-      isMonster: true,
-      avatarUrl: monster.imageUrl,
-      x: 45 + Math.random() * 10,
-      y: 40 + Math.random() * 10,
-      currentHp: monster.hp,
-      maxHp: monster.maxHp,
-      color: '#ef4444',
-    };
-    onTokenAdd(newToken);
+  // Update token HP
+  const handleUpdateTokenHp = (tokenId: string, delta: number) => {
+    const target = tokens.find((t) => t.id === tokenId);
+    if (!target) return;
+    const newHp = Math.max(0, Math.min(target.maxHp, (target.currentHp ?? target.maxHp) + delta));
+    if (onTokenUpdate) {
+      onTokenUpdate({ ...target, currentHp: newHp });
+    }
   };
 
   return (
@@ -174,29 +171,19 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
             <Grid className="w-4 h-4" />
           </button>
 
-          {/* GM Monster Spawn Menu */}
+          {/* GM Spawner Drawer Button */}
           {isHost && (
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] text-[#717b85] uppercase font-cinzel hidden sm:inline">Spawn:</span>
-              <button
-                onClick={() => handleAddMonsterToken('ancient-leshen')}
-                className="px-2 py-1 bg-red-950/40 hover:bg-red-900/60 border border-red-700/50 text-red-300 text-[11px] font-cinzel rounded"
-              >
-                +Leshen
-              </button>
-              <button
-                onClick={() => handleAddMonsterToken('chort-fiend')}
-                className="px-2 py-1 bg-red-950/40 hover:bg-red-900/60 border border-red-700/50 text-red-300 text-[11px] font-cinzel rounded"
-              >
-                +Chort
-              </button>
-              <button
-                onClick={() => handleAddMonsterToken('barghest-hound')}
-                className="px-2 py-1 bg-red-950/40 hover:bg-red-900/60 border border-red-700/50 text-red-300 text-[11px] font-cinzel rounded"
-              >
-                +Barghest
-              </button>
-            </div>
+            <button
+              onClick={() => setIsSpawnerOpen(true)}
+              className="px-2.5 py-1.5 bg-gradient-to-r from-red-950/80 via-[#271216] to-[#1c0f12] hover:from-red-900 hover:to-[#38161b] border border-red-700/60 hover:border-red-500 text-red-200 hover:text-white text-xs font-cinzel font-bold rounded-lg shadow-md shadow-red-950/40 flex items-center gap-1.5 transition-all group"
+              title="Open Entity Spawner Drawer (Monsters, Witchers & NPCs)"
+            >
+              <UserPlus className="w-3.5 h-3.5 text-red-400 group-hover:scale-110 transition-transform" />
+              <span>Spawn Tokens</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-red-900/60 text-[10px] text-red-300 border border-red-700/40 font-mono">
+                {tokens.length}
+              </span>
+            </button>
           )}
         </div>
 
@@ -378,6 +365,19 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
           </div>
         )}
       </div>
+
+      {/* Token Spawner Drawer Popup */}
+      <TokenSpawnerDrawer
+        isOpen={isSpawnerOpen}
+        onClose={() => setIsSpawnerOpen(false)}
+        onSpawnToken={(token, count) => {
+          if (onTokenAdd) onTokenAdd(token, count);
+        }}
+        tokens={tokens}
+        onRemoveToken={onTokenRemove}
+        onClearCategory={onClearCategory}
+        onUpdateTokenHp={handleUpdateTokenHp}
+      />
 
     </div>
   );
