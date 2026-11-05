@@ -17,6 +17,9 @@ import {
   Type,
   Layers,
   Map as MapIcon,
+  Users,
+  Search,
+  Coins,
 } from 'lucide-react';
 import {
   WITCHER_ADVENTURE,
@@ -691,6 +694,144 @@ export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
                     ))}
                   </ul>
                 </div>
+
+                {/* Interactive Scene Elements Table: Characters, Interactables & Secret Treasures */}
+                {((beat.charactersPresent && beat.charactersPresent.length > 0) || 
+                  (beat.interactableItems && beat.interactableItems.length > 0) || 
+                  (beat.secretTreasures && beat.secretTreasures.length > 0)) && (
+                  <div className="mt-4 pt-3.5 border-t border-[#262c33] space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="p-1 rounded bg-[#c99a45]/20 text-[#e2ba6d] border border-[#c99a45]/40">
+                          <Layers className="w-3.5 h-3.5" />
+                        </span>
+                        <h6 className="font-cinzel text-xs font-bold text-[#e2ba6d] uppercase tracking-wider">
+                          Scene Roster, Interactables &amp; Secret Treasures
+                        </h6>
+                      </div>
+
+                      <div className="flex items-center gap-3 text-[11px] font-mono text-[#8a929a]">
+                        <span className="flex items-center gap-1 text-sky-400">
+                          <Users className="w-3 h-3" />
+                          <span>{beat.charactersPresent?.length || 0} Entities</span>
+                        </span>
+                        <span>•</span>
+                        <span className="flex items-center gap-1 text-amber-400">
+                          <Search className="w-3 h-3" />
+                          <span>{beat.interactableItems?.length || 0} Objects</span>
+                        </span>
+                        <span>•</span>
+                        <span className="flex items-center gap-1 text-emerald-400">
+                          <Coins className="w-3 h-3" />
+                          <span>{beat.secretTreasures?.length || 0} Secrets</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* The 3-Column Table */}
+                    <div className="overflow-x-auto rounded-xl border border-[#2b313a] bg-[#0c0e10] shadow-inner">
+                      <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+                        <thead>
+                          <tr className="bg-[#15181b] border-b border-[#2b313a] text-[10px] font-cinzel font-bold text-[#8a929a] uppercase">
+                            <th className="py-2.5 px-3.5 w-[28%] border-r border-[#262c33]">
+                              <div className="flex items-center gap-1.5 text-sky-300">
+                                <Users className="w-3.5 h-3.5" />
+                                <span>Characters Present</span>
+                              </div>
+                            </th>
+                            <th className="py-2.5 px-3.5 w-[38%] border-r border-[#262c33]">
+                              <div className="flex items-center gap-1.5 text-amber-300">
+                                <Search className="w-3.5 h-3.5" />
+                                <span>Interactable Objects &amp; Clues</span>
+                              </div>
+                            </th>
+                            <th className="py-2.5 px-3.5 w-[34%]">
+                              <div className="flex items-center gap-1.5 text-emerald-300">
+                                <Coins className="w-3.5 h-3.5" />
+                                <span>Secret Treasures &amp; Finite Loot</span>
+                              </div>
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="align-top divide-y divide-[#1f242b]">
+                          <tr>
+                            {/* Column 1: Characters Present */}
+                            <td className="p-3 border-r border-[#262c33] bg-[#0e1013]/60 space-y-3">
+                              {beat.charactersPresent?.map((char, cIdx) => (
+                                <div key={cIdx} className="space-y-1">
+                                  <div className="flex items-center justify-between gap-1 flex-wrap">
+                                    <span className="font-cinzel font-bold text-white text-xs">
+                                      {char.name}
+                                    </span>
+                                    <span className={`text-[9px] font-cinzel font-bold px-1.5 py-0.2 rounded border ${
+                                      char.disposition === 'Friendly' ? 'bg-emerald-950/60 text-emerald-300 border-emerald-600/40' :
+                                      char.disposition === 'Hostile' ? 'bg-rose-950/60 text-rose-300 border-rose-600/40' :
+                                      char.disposition === 'Deceptive' ? 'bg-purple-950/60 text-purple-300 border-purple-600/40' :
+                                      char.disposition === 'Guarded' ? 'bg-amber-950/60 text-amber-300 border-amber-600/40' :
+                                      'bg-zinc-800 text-zinc-300 border-zinc-700'
+                                    }`}>
+                                      {char.disposition}
+                                    </span>
+                                  </div>
+                                  <div className="text-[10px] text-[#c99a45] font-mono">{char.role}</div>
+                                  <p className="text-[11px] text-[#8a929a] font-cormorant italic leading-snug">
+                                    {char.description}
+                                  </p>
+                                </div>
+                              ))}
+                            </td>
+
+                            {/* Column 2: Interactable Objects */}
+                            <td className="p-3 border-r border-[#262c33] bg-[#0c0e10] space-y-3">
+                              {beat.interactableItems?.map((item, iIdx) => (
+                                <div key={iIdx} className="space-y-1">
+                                  <div className="flex items-center justify-between gap-1 flex-wrap">
+                                    <span className="font-cinzel font-bold text-zinc-100 text-xs">
+                                      {item.name}
+                                    </span>
+                                    {item.skillCheck && (
+                                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold">
+                                        {item.skillCheck}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] text-zinc-400 font-mono">
+                                    Action: {item.interaction}
+                                  </div>
+                                  <p className="text-[11px] text-[#b8c0c8] font-cormorant italic leading-snug">
+                                    ✨ Outcome: {item.outcome}
+                                  </p>
+                                </div>
+                              ))}
+                            </td>
+
+                            {/* Column 3: Secret Treasures */}
+                            <td className="p-3 bg-[#0e1013]/60 space-y-3">
+                              {beat.secretTreasures?.map((treas, tIdx) => (
+                                <div key={tIdx} className="space-y-1">
+                                  <div className="flex items-center justify-between gap-1 flex-wrap">
+                                    <span className="font-cinzel font-bold text-emerald-200 text-xs">
+                                      {treas.name}
+                                    </span>
+                                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold">
+                                      {treas.discoveryCheck}
+                                    </span>
+                                  </div>
+                                  <div className="text-[11px] font-mono font-bold text-amber-300">
+                                    {treas.reward}
+                                  </div>
+                                  <p className="text-[11px] text-[#8a929a] font-cormorant italic leading-snug">
+                                    {treas.lore}
+                                  </p>
+                                </div>
+                              ))}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

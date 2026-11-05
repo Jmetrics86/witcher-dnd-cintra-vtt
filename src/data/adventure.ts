@@ -39,6 +39,28 @@ export interface PartyChoicePoint {
   otherSurpriseGuidance: string;
 }
 
+export interface BeatCharacter {
+  name: string;
+  role: string;
+  disposition: 'Friendly' | 'Hostile' | 'Neutral' | 'Guarded' | 'Deceptive';
+  description: string;
+}
+
+export interface BeatInteractable {
+  name: string;
+  interaction: string;
+  skillCheck?: string;
+  outcome: string;
+}
+
+export interface BeatSecretTreasure {
+  name: string;
+  discoveryCheck: string;
+  reward: string;
+  vaultItemId?: string;
+  lore: string;
+}
+
 export interface ActStoryBeat {
   id: string;
   beatNumber: string;
@@ -46,6 +68,9 @@ export interface ActStoryBeat {
   timeMarker: string;
   readAloudScript: string;
   npcRoleplayNotes: string[];
+  charactersPresent: BeatCharacter[];
+  interactableItems: BeatInteractable[];
+  secretTreasures: BeatSecretTreasure[];
 }
 
 export interface AdventureAct {
@@ -140,6 +165,62 @@ Suddenly, the iron latch screams as the heavy cross-timber doors bang wide again
             'Sir Danek (Voice: clipped, authoritative, yet ragged with lack of sleep): He avoids eye contact whenever asked *where* the loggers were cutting timber.',
             'Hidden Clue: Beneath his tunic, Danek clutches a cold-iron ward and a splinter of petrified golden heartwood that smells faintly of ozone and dried sap.',
           ],
+          charactersPresent: [
+            {
+              name: 'Sir Danek of the Blue Banner',
+              role: 'Royal Bailiff & Secret Desecrator',
+              disposition: 'Deceptive',
+              description: 'Weary Cintrian knight in sodden mantle, clutching an iron lockbox under his cloak. Haggles nervously while deflecting convoy details.',
+            },
+            {
+              name: 'Innkeeper Torvin',
+              role: 'Tavern Host & Local Gossip',
+              disposition: 'Neutral',
+              description: 'Burly barkeep wiping tankards with an eye on the door. Eager to see Danek leave before steel is drawn.',
+            },
+            {
+              name: 'Terrified Logging Families',
+              role: 'Marnadal Commoners & Refuges',
+              disposition: 'Guarded',
+              description: 'Widows and laborers murmuring about yellow eyes in the mists and weeping heart-trees.',
+            },
+          ],
+          interactableItems: [
+            {
+              name: 'Bounty Contract Sheepskin',
+              interaction: 'Examine the contract wording, official wax seal, and payment guarantees.',
+              skillCheck: 'DC 13 Investigation',
+              outcome: 'The seal is Baron Raymond\'s personal signet, not the Royal Crown of Cintra; the designated logging trail avoids timber stands and heads directly toward ancient barrow mounds.',
+            },
+            {
+              name: 'Sir Danek\'s Concealed Lockbox',
+              interaction: 'Focus Witcher Senses on the slight humming vibration near Danek\'s hip.',
+              skillCheck: 'DC 14 Perception (Witcher Senses)',
+              outcome: 'Your medallion pulses hot. You catch the pungent scent of petrified amber, ozone, and dried blood coming from an iron-bound box tucked under his cloak.',
+            },
+            {
+              name: 'Tavern Rumor Mill & Ledger',
+              interaction: 'Question Torvin or offer coin to listening wagoners about the convoy route.',
+              skillCheck: 'DC 12 Persuasion or Charisma',
+              outcome: 'A tipsy teamster reveals the wagons carried heavy stone-cutting chisels, dwarven pickaxes, and barred iron cages—not axes for felled timber.',
+            },
+          ],
+          secretTreasures: [
+            {
+              name: 'Bailiff\'s Discretionary Coin Purse',
+              discoveryCheck: 'DC 15 Sleight of Hand or DC 14 Intimidation',
+              reward: '🪙 35 Cintrian Orens & Swallow Potion (Phial #3)',
+              vaultItemId: 'potion-swallow-3',
+              lore: 'Emergency hush money provided by Baron Raymond to keep tavern gossip quiet.',
+            },
+            {
+              name: 'Loose Floorboard behind Ale Barrels',
+              discoveryCheck: 'DC 13 Perception (Hearing)',
+              reward: '🪙 20 Cintrian Orens & Grapeshot Bomb (Pack #1)',
+              vaultItemId: 'bomb-grapeshot-1',
+              lore: 'Stashed poacher contraband left behind by a scout who fled the Blackwood after hearing the Chort\'s roar.',
+            },
+          ],
         },
         {
           id: 'beat-1-2',
@@ -154,6 +235,61 @@ Meanwhile, huddled in the darkest booth behind the chimney, a bandaged woodsman 
           npcRoleplayNotes: [
             'Ser Justin (Voice: booming, slurred, arrogant): He singles out Sybilla (Cat) or Bram (Bear) first. He expects mutants to cower before Cintrian nobility.',
             'Kaelan the Mute Woodsman: Cannot speak because black root-spores strangled his vocal cords, but he can sketch a symbol in spilled ale on the table: a split oak tree weeping a radiant circle (the stolen Sun Stone).',
+          ],
+          charactersPresent: [
+            {
+              name: 'Ser Justin of Attre',
+              role: 'Cintrian Tourney Knight & Agitator',
+              disposition: 'Hostile',
+              description: 'Flushed, arrogant young noble in gold-trimmed tabard, emboldened by plum brandy and desperate for glory.',
+            },
+            {
+              name: 'Squires Vann & Gil',
+              role: 'Justin\'s Retinue',
+              disposition: 'Guarded',
+              description: 'Nervous teenagers holding tourney bucklers, terrified of the four armed Witchers.',
+            },
+            {
+              name: 'Kaelan the Woodsman',
+              role: 'Traumatized Convoy Survivor',
+              disposition: 'Friendly',
+              description: 'Mute, bandaged survivor with green lichen beneath his fingernails and black root-scars across his throat.',
+            },
+          ],
+          interactableItems: [
+            {
+              name: 'Kaelan\'s Spilled Ale Diagram',
+              interaction: 'Examine the symbol Kaelan feverishly sketches in spilled ale across the booth table.',
+              skillCheck: 'DC 12 History or Nature',
+              outcome: 'He sketches a hollow ancient oak tree with an amber disk in its hollow heart, surrounded by 3 skull totems. The Sun Stone of Elidyr!',
+            },
+            {
+              name: 'Ser Justin\'s Tourney Pommel',
+              interaction: 'Inspect Justin\'s stance, weapon balance, and dueling intent.',
+              skillCheck: 'DC 13 Insight or Witcher Combat Senses',
+              outcome: 'His blade has never tasted monster flesh; an Axii Sign or a simple disarming pirouette will end his swagger without bloodshed.',
+            },
+            {
+              name: 'Kaelan\'s Spore-Infected Bandages',
+              interaction: 'Inspect the weeping black sores across Kaelan\'s neck.',
+              skillCheck: 'DC 13 Medicine (Herbalism)',
+              outcome: 'Root-spores from an Ancient Leshen! Washing them with White Honey or spirits halts the necrosis and restores his ability to whisper.',
+            },
+          ],
+          secretTreasures: [
+            {
+              name: 'Ser Justin\'s Velvet Tourney Purse',
+              discoveryCheck: 'DC 14 Sleight of Hand or Disarming Surrender',
+              reward: '🪙 45 Cintrian Orens & Silver Wyvern Medallion',
+              lore: 'Gold won in the summer jousts of Cintra, surrendered in shame or lifted in the tavern scrum.',
+            },
+            {
+              name: 'Kaelan\'s Foraged Alchemical Satchel',
+              discoveryCheck: 'Gifted freely if Kaelan is healed or shielded',
+              reward: '🪙 15 Cintrian Orens & Relict Oil Phial',
+              vaultItemId: 'oil-relict-1',
+              lore: 'Rare wolfsbane and monster gall collected in the deep barrows before the massacre.',
+            },
           ],
         },
       ],
@@ -410,6 +546,62 @@ Even stranger, beside the lead wagon lies the corpse of Captain Vester, commande
             'Environmental Clue: The mud shows two distinct monster tracks—the deep cloven craters of a ten-ton Primeval Chort, and the root-like, vanishing stride of an Ancient Leshen.',
             'Human Treachery: The Baron\'s personal steward murdered Captain Vester when Vester refused to desecrate the inner shrine, then fled toward the Barrow of King Elidyr with the Sun Stone!',
           ],
+          charactersPresent: [
+            {
+              name: 'Captain Vester\'s Corpse',
+              role: 'Betrayed Convoy Commander',
+              disposition: 'Neutral',
+              description: 'Dead royal captain lying face down in the mud, clutching a broken Cintrian officer\'s seal, murdered from behind with a stiletto.',
+            },
+            {
+              name: 'Slaughtered Convoy Draught Horses',
+              role: 'Monster Carnage Evidence',
+              disposition: 'Neutral',
+              description: 'Six massive heavy horses gored by curved horns and rooted into the mire by thorny wooden tendrils.',
+            },
+            {
+              name: 'Spectral Raven Watchers',
+              role: 'Eyes of the Ancient Leshen',
+              disposition: 'Hostile',
+              description: 'Dozens of uncanny black crows perched motionlessly on high branches, tracking the Witchers\' investigative steps.',
+            },
+          ],
+          interactableItems: [
+            {
+              name: 'Captain Vester\'s Stiletto Wound',
+              interaction: 'Examine the angle of entry and weapon characteristics on Vester\'s corpse.',
+              skillCheck: 'DC 13 Medicine or Investigation',
+              outcome: 'Clean thrust between ribs with a 5-inch thin assassin blade smeared with paralytic belladonna. Struck by a trusted companion before the monsters attacked.',
+            },
+            {
+              name: 'Stolen Runic Monolith Slabs',
+              interaction: 'Brush away canvas tarps and examine the elven engravings.',
+              skillCheck: 'DC 14 Arcana or History',
+              outcome: 'The slabs are sacred architectural foundation stones pried from King Elidyr\'s Barrow. Inscribed with warding oaths that held primeval entities in slumber.',
+            },
+            {
+              name: 'Dual Monster Tracks in the Silt',
+              interaction: 'Analyze the depth and stride of the mud craters.',
+              skillCheck: 'DC 13 Survival (Tracking)',
+              outcome: 'Identifies deep cloven hooves of a 10-ton Primeval Chort and vanishing root-strides of an Ancient Leshen. The two apex monsters hunted in unison!',
+            },
+          ],
+          secretTreasures: [
+            {
+              name: 'Captain Vester\'s Hidden Wagon Cache',
+              discoveryCheck: 'DC 14 Investigation under the wagon floorboard',
+              reward: '🪙 60 Cintrian Orens & Mahakaman Clan Carbon Steel Blade',
+              vaultItemId: 'steel-mahakaman',
+              lore: 'The royal escort\'s locked payroll chest and a razor-honed dwarven steel blade hidden from looters.',
+            },
+            {
+              name: 'Burned Convoy Medical Satchel in Briars',
+              discoveryCheck: 'DC 13 Athletics or Aard Sign to clear thorns',
+              reward: '🪙 30 Cintrian Orens & White Raffard\'s Decoction (Phial #2)',
+              vaultItemId: 'potion-white-raffard-2',
+              lore: 'An apothecary kit dropped by the wagon surgeon when the Chort overturned the convoy.',
+            },
+          ],
         },
         {
           id: 'beat-2-2',
@@ -420,6 +612,56 @@ Even stranger, beside the lead wagon lies the corpse of Captain Vester, commande
           npcRoleplayNotes: [
             'Switch from the Story Visual back to the Act II Tactical Battle Map (`The Primeval Blackwood`) so players can position their tokens and fight the 4 Barghest Hounds!',
             'Combat Tip: Remind players that Yrden Circles and Moon Dust bombs strip the Barghests\' incorporeal resistance!',
+          ],
+          charactersPresent: [
+            {
+              name: 'Four Barghest Spectral Hounds',
+              role: 'Ectoplasmic Forest Pack',
+              disposition: 'Hostile',
+              description: 'Incorporeal ghost hounds ablaze with emerald necro-fire, hunting in tandem to drag intruders to the grave.',
+            },
+            {
+              name: 'The Spectral Pack Alpha',
+              role: 'Vengeful Echo of the Woods',
+              disposition: 'Hostile',
+              description: 'Massive hound manifesting atop the wagon wreckage, directing flanking attacks and blinding flame spits.',
+            },
+          ],
+          interactableItems: [
+            {
+              name: 'Blazing Wagon Hub & Burning Pitch',
+              interaction: 'Kick or cast Aard Sign on the smoldering timber wheel to spray embers.',
+              skillCheck: 'DC 12 Athletics or Aard Sign',
+              outcome: 'Ignites spilled lantern oil in a 15-ft crescent, blocking the hounds and dealing 2d6 fire damage to any spectral beast leaping through.',
+            },
+            {
+              name: 'Woven Raven Effigies in the Canopy',
+              interaction: 'Target the skull-and-feather charms suspended from low branches.',
+              skillCheck: 'DC 13 ranged attack or Igni Sign',
+              outcome: 'Burning an effigy snaps the spectral anchor, stripping one Barghest of its incorporeal damage resistances for the remainder of the battle.',
+            },
+            {
+              name: 'Overturned Iron Draught Harness',
+              interaction: 'Heave the spiked iron yoke to pin a charging hound.',
+              skillCheck: 'DC 14 Strength (Athletics)',
+              outcome: 'Pins a spectral hound to the bog mud, immobilizing it and giving adjacent melee attackers advantage.',
+            },
+          ],
+          secretTreasures: [
+            {
+              name: 'Gilded Cavalry Pommel in the Silt',
+              discoveryCheck: 'DC 14 Perception after the hounds disperse',
+              reward: '🪙 40 Cintrian Orens & Sir Danek\'s Cintrian Cavalry Sabre',
+              vaultItemId: 'steel-cintrian-sabre',
+              lore: 'The ornate lion dueling sabre carried by Sir Danek\'s murdered lieutenant.',
+            },
+            {
+              name: 'Hollow Trunk behind the Raven Totem',
+              discoveryCheck: 'DC 13 Witcher Senses (Sight/Smell)',
+              reward: '🪙 25 Cintrian Orens & Moon Dust Bomb (Pack #2)',
+              vaultItemId: 'bomb-moon-dust-2',
+              lore: 'A hidden stash of silver-salt munitions buried by an elven scout who foresaw the spectral curse.',
+            },
           ],
         },
       ],
@@ -596,6 +838,62 @@ At the sound of your boots on the wet flagstones, the Grave Hag's head twists ne
           npcRoleplayNotes: [
             'Tactical Callout: Remind the players of the Witcher Targeted Strike rule! Any Witcher can take a -2 penalty to their attack roll to target the Hag\'s tongue; dealing 15+ slashing damage in a single hit severs her tongue, permanently disabling her Tongue Lash & Pull attack!',
           ],
+          charactersPresent: [
+            {
+              name: 'The Marnadal Grave Hag',
+              role: 'Crypt Matriarch & Marrow Feaster',
+              disposition: 'Hostile',
+              description: 'Grotesque, ash-skinned necrophage perched on King Elidyr\'s sarcophagus, flicking a 15-ft barbed tongue to drag victims into bone-pits.',
+            },
+            {
+              name: 'Two Scurrying Rotfiends',
+              role: 'Corrosive Thralls',
+              disposition: 'Hostile',
+              description: 'Bloated, ghoulish scavengers that detonate into acidic bile upon receiving fatal damage.',
+            },
+            {
+              name: 'Master Corvus the Steward (Fresh Corpse)',
+              role: 'Baron Raymond\'s Chief Emissary',
+              disposition: 'Neutral',
+              description: 'Slain courtier in fine velvet doublet, his throat crushed by the hag, clutching a sealed scroll and iron lockbox.',
+            },
+          ],
+          interactableItems: [
+            {
+              name: 'The Prehensile Venom Tongue',
+              interaction: 'Take a -2 called shot penalty to sever the hag\'s lashing appendage.',
+              skillCheck: 'Melee attack with Silver blade (15+ slashing damage)',
+              outcome: 'Slices off the tongue, permanently preventing her grapple drag and stunning the Hag for 1 round.',
+            },
+            {
+              name: 'Sarcophagus Limestone Heavy Lid',
+              interaction: 'Topple the massive 500-lb burial slab using telekinesis or raw leverage.',
+              skillCheck: 'DC 14 Athletics or Aard Sign',
+              outcome: 'Crushes adjacent rotfiends beneath tons of carved limestone, dealing 3d10 bludgeoning damage.',
+            },
+            {
+              name: 'Flooded Marrow & Bone Ash Pit',
+              interaction: 'Move through the flooded flagstones without slipping or inhaling bone dust.',
+              skillCheck: 'DC 12 Acrobatics',
+              outcome: 'Avoids difficult terrain and bone-ash blindness when maneuvering behind the hag.',
+            },
+          ],
+          secretTreasures: [
+            {
+              name: 'King Elidyr\'s Burial Regalia',
+              discoveryCheck: 'DC 14 Investigation inside the central sarcophagus',
+              reward: '🪙 75 Cintrian Orens & Ancient Elven Moon-Thread Silk Armor Set',
+              vaultItemId: 'armor-tir-na-lia',
+              lore: 'An otherworldly silk cuirass woven in Tir ná Lia before the First Conjunction, offering supernatural cold and necrotic resistance.',
+            },
+            {
+              name: 'Marrow Hag\'s Trophy Charm',
+              discoveryCheck: 'Harvested from the defeated hag with Silver blade',
+              reward: '🪙 35 Cintrian Orens & Grave Hag Contract Trophy (Ear & Tongue Charm)',
+              vaultItemId: 'quest-grave-hag-ear',
+              lore: 'A grisly necklace of noble signet rings and fingerbones collected over two centuries.',
+            },
+          ],
         },
         {
           id: 'beat-3-2',
@@ -613,6 +911,56 @@ Carved around the circular lock are five ancient triangular recesses, each etche
           npcRoleplayNotes: [
             'Show the Act III Story Visual (`The Runic Covenant Altar & The Stolen Sun Stone`) when the players approach the altar after defeating the Grave Hag!',
             'The Baron\'s Letter reads: *"Corvus—Bring me the Sun Stone from Elidyr\'s root-shrine before the Royal Conclave. With its gold-transmuting aura, Marnadal will eclipse the High King\'s treasury. If the old forest guardian wakes, blame it on a rabid beast and hire disposable witchers to butcher it."*',
+          ],
+          charactersPresent: [
+            {
+              name: 'Spirit of King Elidyr',
+              role: 'First Unifier of Marnadal (Echo)',
+              disposition: 'Neutral',
+              description: 'Luminous spectral presence manifesting in the altar mist as each Witcher Sign ignites its corresponding rune.',
+            },
+            {
+              name: 'Master Corvus (Post-Mortem Witness)',
+              role: 'The Baron\'s Silenced Architect',
+              disposition: 'Neutral',
+              description: 'Body resting against the altar pedestal, bearing the physical evidence of Baron Raymond\'s grand conspiracy.',
+            },
+          ],
+          interactableItems: [
+            {
+              name: 'The Baron\'s Signed Treason Letter',
+              interaction: 'Pry the bloodstained parchment from Master Corvus\'s stiff fingers.',
+              skillCheck: 'Automatic upon inspection',
+              outcome: 'Provides irrefutable legal proof that Baron Raymond orchestrated the desecration to hoard gold, intending to betray the Witchers.',
+            },
+            {
+              name: 'The Five Triangular Sign Recesses',
+              interaction: 'Channel the five Witcher Signs in correct sequence: Aard -> Quen -> Yrden -> Igni -> Axii.',
+              skillCheck: 'Spellcasting or Vigor expenditure (No roll needed if deciphered)',
+              outcome: 'The runic grate unlatches with an echoing golden chime, raising the pulsing Sun Stone of Elidyr on an illuminated stone plinth.',
+            },
+            {
+              name: 'Elder Speech Treaty Inscriptions',
+              interaction: 'Decipher the elven verses along the altar\'s circular rim.',
+              skillCheck: 'DC 13 History or Elder Speech lore',
+              outcome: 'Warns that separating the Sun Stone from the Heart Tree drives the woodland guardian insane with agony.',
+            },
+          ],
+          secretTreasures: [
+            {
+              name: 'Master Corvus\'s Iron Treasury Box',
+              discoveryCheck: 'Key on Corvus\'s belt or DC 14 Sleight of Hand',
+              reward: '🪙 120 Cintrian Orens & Baron Raymond\'s Signed Safe-Conduct Pass',
+              vaultItemId: 'quest-baron-sigil',
+              lore: 'The Baron\'s secret military bypass warrant and royal gold intended to buy mercenary silence.',
+            },
+            {
+              name: 'Altar Sanctum Consecrated Relic',
+              discoveryCheck: 'DC 15 Arcana or Witcher Senses when all 5 runes ignite',
+              reward: '🪙 50 Cintrian Orens & Moonblade Ancient Elven Silver Relic',
+              vaultItemId: 'silver-moonblade',
+              lore: 'An ancient silver sword blessed by elven sages to sever spectral ties and light up subterranean crypts.',
+            },
           ],
         },
       ],
@@ -786,6 +1134,62 @@ Then the earth itself trembles. Crashing through the treeline comes a mountainou
             'Show the Act IV Story Visual (`The Weeping Heart Tree & The Ancient Leshen`) for the dramatic boss reveal, then switch to the Act IV Tactical Battle Map (`The Corrupted Monolith Grove`) for combat!',
             'Totem Mechanic: While the 3 Totems (AC 12, 20 HP each, vulnerable to Fire/Igni) stand, the Leshen regenerates 15 HP at the start of its turn. Check if Act II Choice #3 already destroyed 1 Totem!',
           ],
+          charactersPresent: [
+            {
+              name: 'The Ancient Leshen of Marnadal',
+              role: 'Awakened Relict Woodland God',
+              disposition: 'Hostile',
+              description: 'Twelve-foot ancient wooden relict wearing an elk skull crown, commanding the living roots of the grove and teleporting in raven storms.',
+            },
+            {
+              name: 'Three Relict Skull-Totems',
+              role: 'Regenerative Magic Conduits',
+              disposition: 'Hostile',
+              description: 'Carved cedar totems crowned with stag skulls and raven feathers, channeling 15 HP per turn back into the Leshen.',
+            },
+            {
+              name: 'Vortex Raven Murder',
+              role: 'Relict Swarm',
+              disposition: 'Hostile',
+              description: 'Hundreds of black crows that blind attackers, intercept arrows, and mask the Leshen\'s phase shifts.',
+            },
+          ],
+          interactableItems: [
+            {
+              name: 'The Three Resonant Skull Totems',
+              interaction: 'Target the totems with weapons or spells (AC 12, 20 HP each, Vulnerable to Fire).',
+              skillCheck: 'Attack roll or Igni Sign burst',
+              outcome: 'Shattering each totem permanently eliminates 5 points of the Leshen\'s regeneration and causes a psychic backlash.',
+            },
+            {
+              name: 'Thorn-Studded Root Spikes',
+              interaction: 'Spot the shifting earth and dodge the erupting underground briar thorns.',
+              skillCheck: 'DC 13 Dexterity save or Witcher Senses',
+              outcome: 'Dodging avoids 2d6 piercing damage and prevents being restrained in place.',
+            },
+            {
+              name: 'The Weeping Heart Tree Split Trunk',
+              interaction: 'Approach the colossal split oak weeping amber sap in the center of the ring.',
+              skillCheck: 'DC 12 Nature or Arcana',
+              outcome: 'Reveals the hollow sacred socket where the Sun Stone originally rested for seven centuries before Baron Raymond\'s defilement.',
+            },
+          ],
+          secretTreasures: [
+            {
+              name: 'Cache inside Fallen Southern Totem',
+              discoveryCheck: 'DC 13 Perception after felling the totem',
+              reward: '🪙 50 Cintrian Orens & Tawny Owl Potion (Phial #2)',
+              vaultItemId: 'potion-tawny-owl-2',
+              lore: 'Sacred Vigor-accelerating elixir stored in a hollowed horn offering by ancient druidic herbalists.',
+            },
+            {
+              name: 'Ancient Druid Offering Urn under Heart Tree',
+              discoveryCheck: 'DC 14 Investigation among the roots',
+              reward: '🪙 80 Cintrian Orens & Dimeritium Anti-Magic Bomb',
+              vaultItemId: 'bomb-dimeritium-1',
+              lore: 'A sealed urn of old Cintrian coins and raw dimeritium ore meant to seal rogue rifts.',
+            },
+          ],
         },
         {
           id: 'beat-4-2',
@@ -796,6 +1200,56 @@ Then the earth itself trembles. Crashing through the treeline comes a mountainou
           npcRoleplayNotes: [
             'If the party chose Option 1 in Act III (Restore the Sun Stone), remind them they can use an Action at the Heart Tree (DC 13 Persuasion/Axii) to seat the Sun Stone—causing the Ancient Leshen to halt its attacks and help drag the maddened Chort down!',
             'If the party chose Option 2 in Act III (Overcharge Trap), let them trigger the 45-damage detonation when the Leshen steps within 10 feet of the tree!',
+          ],
+          charactersPresent: [
+            {
+              name: 'The Primeval Chort of the Yaruga',
+              role: 'Continental Apex Behemoth',
+              disposition: 'Hostile',
+              description: 'Ten-ton horned mountain monster with a third amber eye, charging with devastating momentum to pulverize stone and bone.',
+            },
+            {
+              name: 'Baron Raymond & Mounted Royal Outriders',
+              role: 'Scheming Noble Opportunists',
+              disposition: 'Deceptive',
+              description: 'Watching with heavy crossbows from the ridge, ready to claim the beast\'s head and cheat the mutants of their bounty.',
+            },
+          ],
+          interactableItems: [
+            {
+              name: 'Heart Tree Sun Stone Socket',
+              interaction: 'Action to slot the Sun Stone into the weeping oak heart (DC 13 Persuasion/Axii).',
+              skillCheck: 'DC 13 Charisma (Persuasion) or Axii Sign',
+              outcome: 'The Leshen\'s agony ceases; ancient roots burst from the soil to ensnare the charging Chort and pin it to the earth!',
+            },
+            {
+              name: 'Standing Granite Monoliths (Cover & Hazard)',
+              interaction: 'Bait the Chort into charging a 30-ton ancient standing stone.',
+              skillCheck: 'DC 14 Dexterity (Acrobatics) or Dodge reaction',
+              outcome: 'The Chort slams horns-first into the monolith, taking 3d8 bludgeoning damage and falling Prone and Stunned for 1 turn.',
+            },
+            {
+              name: 'Overcharged Altar Glyph Detonator',
+              interaction: 'If rigged in Act III, trigger the explosive magical pulse when monsters group up.',
+              skillCheck: 'Reaction (Free if trap was set)',
+              outcome: 'Detonates with thunderous concussive force, dealing 45 radiant force damage to all entities near the Heart Tree!',
+            },
+          ],
+          secretTreasures: [
+            {
+              name: 'Primeval Heart-Tree Core & Chort Horns',
+              discoveryCheck: 'DC 12 Witcher Senses / Survival harvesting after combat',
+              reward: '🪙 150 Cintrian Orens, Primeval Heart-Tree Amber Core, & Tor Zireael Ancient Swallow Silver Sword',
+              vaultItemId: 'silver-tor-zireael',
+              lore: 'A legendary elven silver blade entwined with ancient roots that permanently curtails monster regeneration.',
+            },
+            {
+              name: 'Baron Raymond\'s Carriage Bounty Chest',
+              discoveryCheck: 'Claimed by contractual mandate or extracted by force',
+              reward: '🪙 250 Cintrian Orens & Cintrian Royal Guard Lion Half-Plate Set',
+              vaultItemId: 'armor-cintrian-guard',
+              lore: 'The full royal treasury bounty and the ceremonial half-plate armor of the Marnadal knight commander.',
+            },
           ],
         },
       ],
