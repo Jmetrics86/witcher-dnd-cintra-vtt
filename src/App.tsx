@@ -16,6 +16,7 @@ import { getAssetUrl } from './utils/assets';
 
 import { 
   WitcherCharacter, 
+  WitcherSchool,
   MapScene, 
   MapToken, 
   ChatMessage, 
@@ -836,12 +837,161 @@ export const App: React.FC = () => {
   const handleTokenUpdate = (updatedToken: MapToken) => {
     setTokens((prev) => prev.map((t) => (t.id === updatedToken.id ? updatedToken : t)));
 
+    // If updated token is a Witcher, sync to character sheet!
+    if (updatedToken.school || !updatedToken.isMonster) {
+      setSelectedCharacter((prev) => {
+        if (prev.school === updatedToken.school || prev.name === updatedToken.name) {
+          return { ...prev, currentHp: updatedToken.currentHp };
+        }
+        return prev;
+      });
+    }
+
     p2pManager.send({
       type: 'SYNC_STATE',
       senderId: selectedCharacter.id,
       senderName: selectedCharacter.name,
       payload: {
         tokens: tokens.map((t) => (t.id === updatedToken.id ? updatedToken : t)),
+      },
+      timestamp: Date.now(),
+    });
+  };
+
+  // Adjust Token HP by Delta (+/-) — Linked directly to Character Sheets!
+  const handleTokenHpChange = (tokenId: string, delta: number) => {
+    let updatedName = '';
+    let newHp = 0;
+    let maxHp = 0;
+    let tokenSchool: WitcherSchool | undefined = undefined;
+
+    setTokens((prev) =>
+      prev.map((t) => {
+        if (t.id === tokenId) {
+          const calcHp = Math.max(0, Math.min(t.maxHp, (t.currentHp ?? t.maxHp) + delta));
+          updatedName = t.name;
+          newHp = calcHp;
+          maxHp = t.maxHp;
+          tokenSchool = t.school;
+          return { ...t, currentHp: calcHp };
+        }
+        return t;
+      })
+    );
+
+    // LINK TO CHARACTER SHEET: If this token is a Witcher character, update the sheet immediately!
+    if (tokenSchool || selectedCharacter.name === updatedName) {
+      setSelectedCharacter((prev) => {
+        if (prev.school === tokenSchool || prev.name === updatedName) {
+          return { ...prev, currentHp: newHp };
+        }
+        return prev;
+      });
+    }
+
+    if (delta < 0) {
+      handleAddLogMessage(`⚔️ ${updatedName} took ${Math.abs(delta)} damage! (${newHp}/${maxHp} HP)`, 'combat');
+    } else {
+      handleAddLogMessage(`💚 ${updatedName} recovered ${delta} HP! (${newHp}/${maxHp} HP)`, 'combat');
+    }
+
+    p2pManager.send({
+      type: 'SYNC_STATE',
+      senderId: 'gm',
+      senderName: 'Game Master',
+      payload: {
+        tokens: tokens.map((t) => (t.id === tokenId ? { ...t, currentHp: newHp } : t)),
+      },
+      timestamp: Date.now(),
+    });
+  };
+
+  // Set Absolute Token HP (e.g. Full Heal, 0 HP down) — Linked to Character Sheets!
+  const handleSetTokenHp = (tokenId: string, targetHp: number) => {
+    let updatedName = '';
+    let newHp = 0;
+    let maxHp = 0;
+    let tokenSchool: WitcherSchool | undefined = undefined;
+
+    setTokens((prev) =>
+      prev.map((t) => {
+        if (t.id === tokenId) {
+          const calcHp = Math.max(0, Math.min(t.maxHp, targetHp));
+          updatedName = t.name;
+          newHp = calcHp;
+          maxHp = t.maxHp;
+          tokenSchool = t.school;
+          return { ...t, currentHp: calcHp };
+        }
+        return t;
+      })
+    );
+
+    // LINK TO CHARACTER SHEET:
+    if (tokenSchool || selectedCharacter.name === updatedName) {
+      setSelectedCharacter((prev) => {
+        if (prev.school === tokenSchool || prev.name === updatedName) {
+          return { ...prev, currentHp: newHp };
+        }
+        return prev;
+      });
+    }
+
+    handleAddLogMessage(`💚 ${updatedName} HP set to ${newHp}/${maxHp} HP.`, 'combat');
+
+    p2pManager.send({
+      type: 'SYNC_STATE',
+      senderId: 'gm',
+      senderName: 'Game Master',
+      payload: {
+        tokens: tokens.map((t) => (t.id === tokenId ? { ...t, currentHp: newHp } : t)),
+      },
+      timestamp: Date.now(),
+    });
+  };
+
+  // Open Character Sheet for a specific Witcher School directly from Map Token
+  const handleOpenWitcherSheet = (school: WitcherSchool) => {
+    const found = PREGEN_WITCHERS.find((w) => w.school === school);
+    if (found) {
+      const matchingToken = tokens.find((t) => t.school === school || t.name === found.name);
+      if (matchingToken && matchingToken.currentHp !== undefined) {
+        setSelectedCharacter({ ...found, currentHp: matchingToken.currentHp });
+      } else {
+        setSelectedCharacter(found);
+      }
+    }
+    setActiveTab('sheet');
+  };
+
+  // Update Character from CharacterSheet — Linked directly to Map Tokens!
+  const handleUpdateCharacter = (updated: WitcherCharacter) => {
+    setSelectedCharacter(updated);
+
+    // Synchronize to the Map Token for this Witcher!
+    setTokens((prev) =>
+      prev.map((t) => {
+        if (t.school === updated.school || t.name === updated.name) {
+          return {
+            ...t,
+            currentHp: updated.currentHp,
+            maxHp: updated.maxHp,
+          };
+        }
+        return t;
+      })
+    );
+
+    p2pManager.send({
+      type: 'SYNC_STATE',
+      senderId: updated.id,
+      senderName: updated.name,
+      payload: {
+        tokens: tokens.map((t) =>
+          t.school === updated.school || t.name === updated.name
+            ? { ...t, currentHp: updated.currentHp, maxHp: updated.maxHp }
+            : t
+        ),
       },
       timestamp: Date.now(),
     });
@@ -1264,6 +1414,8 @@ export const App: React.FC = () => {
                 onTokenAdd={handleTokenAdd}
                 onTokenRemove={handleTokenRemove}
                 onTokenUpdate={handleTokenUpdate}
+                onTokenHpChange={handleTokenHpChange}
+                onSetTokenHp={handleSetTokenHp}
                 onClearCategory={handleClearTokens}
                 onPing={handlePing}
                 pingLocation={pingLocation}
@@ -1271,6 +1423,7 @@ export const App: React.FC = () => {
                 selectedCharacter={selectedCharacter}
                 activeStoryVisual={activeStoryVisual}
                 onShowStoryVisual={handleShowStoryVisual}
+                onOpenWitcherSheet={handleOpenWitcherSheet}
               />
             </div>
 
@@ -1281,8 +1434,6 @@ export const App: React.FC = () => {
                 onSendMessage={handleSendMessage}
                 currentUserName={selectedCharacter.name}
                 currentUserSchool={selectedCharacter.school}
-                onOpenNotionModal={() => setIsNotionModalOpen(true)}
-                onOpenInstructions={() => setIsInstructionsModalOpen(true)}
               />
             </div>
           </div>
@@ -1293,7 +1444,7 @@ export const App: React.FC = () => {
           <div className="max-w-4xl mx-auto w-full">
             <CharacterSheet
               character={selectedCharacter}
-              onUpdateCharacter={setSelectedCharacter}
+              onUpdateCharacter={handleUpdateCharacter}
               onRollDice={handleRollDice}
               onAddLogMessage={handleAddLogMessage}
             />

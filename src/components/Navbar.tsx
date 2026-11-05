@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Shield, 
   BookOpen, 
@@ -14,6 +14,8 @@ import {
   HelpCircle,
   Lock,
   Crown,
+  ChevronDown,
+  Layers
 } from 'lucide-react';
 import { WitcherCharacter, MapScene } from '../types';
 
@@ -64,13 +66,31 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
 }) => {
+  const [isCompendiumOpen, setIsCompendiumOpen] = useState(false);
+  const compendiumRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (compendiumRef.current && !compendiumRef.current.contains(e.target as Node)) {
+        setIsCompendiumOpen(false);
+      }
+    };
+    if (isCompendiumOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isCompendiumOpen]);
+
   return (
-    <header className="bg-[#111315]/95 border-b border-[#2e3338] sticky top-0 z-40 backdrop-blur-md px-4 py-2.5">
-      <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+    <header className="bg-[#111315]/95 border-b border-[#2e3338] sticky top-0 z-40 backdrop-blur-md px-3 sm:px-4 py-2">
+      <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
         
         {/* Left: Brand & Witcher Seal */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full border border-[#c99a45] bg-[#1a1c1e] flex items-center justify-center shadow-lg shadow-black/50 overflow-hidden relative group">
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="w-9 h-9 rounded-full border border-[#c99a45] bg-[#1a1c1e] flex items-center justify-center shadow-lg shadow-black/50 overflow-hidden relative group">
             {selectedCharacter ? (
               <img 
                 src={selectedCharacter.avatarUrl} 
@@ -78,129 +98,164 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" 
               />
             ) : (
-              <Sparkles className="w-5 h-5 text-[#c99a45]" />
+              <Sparkles className="w-4 h-4 text-[#c99a45]" />
             )}
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-cinzel text-sm sm:text-base font-bold gold-gradient-text tracking-wider">
+              <span className="font-cinzel text-xs sm:text-sm font-bold gold-gradient-text tracking-wider">
                 THE BLOOD OF MARNADAL
               </span>
-              <span className="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded bg-[#c99a45]/20 text-[#e2ba6d] border border-[#c99a45]/40">
+              <span className="text-[9px] uppercase font-bold tracking-widest px-1.5 py-0.2 rounded bg-[#c99a45]/20 text-[#e2ba6d] border border-[#c99a45]/40 hidden md:inline">
                 Cintra 1184
               </span>
             </div>
-            <p className="text-xs text-[#8a929a] font-cormorant italic hidden sm:block">
-              Witcher 5e Multiplayer VTT • {currentScene.name}
+            <p className="text-[11px] text-[#8a929a] font-cormorant italic hidden sm:block">
+              Act {currentScene.actNumber}: {currentScene.name.split('—')[0]}
             </p>
           </div>
         </div>
 
-        {/* Center: Main View Tabs */}
-        <div className="flex items-center gap-1 bg-[#191c1f] p-1 rounded-lg border border-[#2b3136]">
-          <button
-            onClick={() => setActiveTab('map')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-cinzel transition-all ${
-              activeTab === 'map'
-                ? 'bg-[#c99a45] text-black font-bold shadow-md shadow-[#c99a45]/20'
-                : 'text-[#a6b1b9] hover:text-white hover:bg-[#252a2f]'
-            }`}
-          >
-            <MapIcon className="w-3.5 h-3.5" />
-            <span>Map</span>
-          </button>
+        {/* Center: Clean Core Views & Consolidated Compendium Dropdown */}
+        <div className="flex items-center gap-1.5">
+          {/* Primary View Switcher: Map vs Sheet */}
+          <div className="flex items-center gap-1 bg-[#16181b] p-1 rounded-lg border border-[#2b3137]">
+            <button
+              onClick={() => setActiveTab('map')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-cinzel transition-all ${
+                activeTab === 'map'
+                  ? 'bg-[#c99a45] text-black font-bold shadow-md shadow-[#c99a45]/20'
+                  : 'text-[#a6b1b9] hover:text-white hover:bg-[#22272d]'
+              }`}
+            >
+              <MapIcon className="w-3.5 h-3.5" />
+              <span>Map</span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('sheet')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-cinzel transition-all ${
-              activeTab === 'sheet'
-                ? 'bg-[#c99a45] text-black font-bold shadow-md shadow-[#c99a45]/20'
-                : 'text-[#a6b1b9] hover:text-white hover:bg-[#252a2f]'
-            }`}
-          >
-            <Shield className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Witcher</span> Sheet
-          </button>
+            <button
+              onClick={() => setActiveTab('sheet')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-cinzel transition-all ${
+                activeTab === 'sheet'
+                  ? 'bg-[#c99a45] text-black font-bold shadow-md shadow-[#c99a45]/20'
+                  : 'text-[#a6b1b9] hover:text-white hover:bg-[#22272d]'
+              }`}
+            >
+              <Shield className="w-3.5 h-3.5" />
+              <span>Witcher Sheet</span>
+            </button>
+          </div>
 
-          <button
-            onClick={onOpenBestiaryModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-cinzel text-[#a6b1b9] hover:text-white hover:bg-[#252a2f] transition-all"
-          >
-            <BookOpen className="w-3.5 h-3.5 text-red-400" />
-            <span className="hidden md:inline">Bestiary</span>
-          </button>
+          {/* Consolidated Compendium & Guides Dropdown */}
+          <div className="relative" ref={compendiumRef}>
+            <button
+              onClick={() => setIsCompendiumOpen(!isCompendiumOpen)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel border transition-all ${
+                isCompendiumOpen
+                  ? 'bg-[#1e2227] text-[#e2ba6d] border-[#c99a45]'
+                  : 'bg-[#16181b] text-[#b0b8c0] border-[#2b3137] hover:text-white hover:border-[#3e4652]'
+              }`}
+              title="Open Compendium, Module, Bestiary & Rules"
+            >
+              <Layers className="w-3.5 h-3.5 text-[#c99a45]" />
+              <span className="hidden sm:inline">Compendium</span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isCompendiumOpen ? 'rotate-180' : ''}`} />
+            </button>
 
-          <button
-            onClick={onOpenGuideModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-cinzel text-[#a6b1b9] hover:text-white hover:bg-[#252a2f] transition-all"
-          >
-            <Scroll className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden md:inline">4hr Module</span>
-          </button>
+            {/* Dropdown Menu Popover */}
+            {isCompendiumOpen && (
+              <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-64 bg-[#141619] border border-[#2e353e] rounded-xl shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+                <div className="px-3 py-1.5 text-[10px] font-cinzel font-bold text-[#7a838d] uppercase tracking-wider border-b border-[#22272d] mb-1">
+                  Adventure & Campaign Guides
+                </div>
 
-          <button
-            onClick={onOpenNotionModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-cinzel text-[#c99a45] hover:text-[#e2ba6d] hover:bg-[#252a2f] transition-all"
-            title="Auto-generate Notion Campaign Wiki"
-          >
-            <FileText className="w-3.5 h-3.5 text-[#c99a45]" />
-            <span className="hidden lg:inline">Notion Wiki</span>
-          </button>
+                {/* 4hr Module */}
+                <button
+                  onClick={() => {
+                    setIsCompendiumOpen(false);
+                    onOpenGuideModal();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-xs font-cinzel text-[#d6d9dc] hover:text-white hover:bg-[#1e2329] transition-colors group"
+                >
+                  <Scroll className="w-4 h-4 text-amber-400 shrink-0 group-hover:scale-110 transition-transform" />
+                  <div>
+                    <div className="font-bold text-white group-hover:text-[#e2ba6d]">4-Hour Adventure Module</div>
+                    <div className="text-[10px] text-[#78828c] font-mono">The Blood of Marnadal (Acts I–IV)</div>
+                  </div>
+                </button>
 
-          <button
-            onClick={onOpenInstructionsModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-cinzel text-[#e2ba6d] hover:text-white hover:bg-[#252a2f] border border-[#c99a45]/30 bg-[#c99a45]/10 transition-all shadow-sm shadow-[#c99a45]/10"
-            title="Complete Instructions: How to Play as a Witcher & How to GM the Game"
-          >
-            <HelpCircle className="w-3.5 h-3.5 text-[#c99a45]" />
-            <span className="hidden sm:inline">How to Play & GM</span>
-            <span className="sm:hidden">Guide</span>
-          </button>
+                {/* Bestiary */}
+                <button
+                  onClick={() => {
+                    setIsCompendiumOpen(false);
+                    onOpenBestiaryModal();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-xs font-cinzel text-[#d6d9dc] hover:text-white hover:bg-[#1e2329] transition-colors group"
+                >
+                  <BookOpen className="w-4 h-4 text-red-400 shrink-0 group-hover:scale-110 transition-transform" />
+                  <div>
+                    <div className="font-bold text-white group-hover:text-red-300">Bestiary & Monster Tactics</div>
+                    <div className="text-[10px] text-[#78828c] font-mono">Stats, Oils & Vulnerabilities</div>
+                  </div>
+                </button>
+
+                {/* How to Play & GM */}
+                <button
+                  onClick={() => {
+                    setIsCompendiumOpen(false);
+                    onOpenInstructionsModal();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-xs font-cinzel text-[#d6d9dc] hover:text-white hover:bg-[#1e2329] transition-colors group"
+                >
+                  <HelpCircle className="w-4 h-4 text-[#c99a45] shrink-0 group-hover:scale-110 transition-transform" />
+                  <div>
+                    <div className="font-bold text-white group-hover:text-[#e2ba6d]">How to Play & GM Rules</div>
+                    <div className="text-[10px] text-[#78828c] font-mono">Dice, Signs & Mechanics Guide</div>
+                  </div>
+                </button>
+
+                {/* Notion Wiki */}
+                <button
+                  onClick={() => {
+                    setIsCompendiumOpen(false);
+                    onOpenNotionModal();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-xs font-cinzel text-[#d6d9dc] hover:text-white hover:bg-[#1e2329] transition-colors group"
+                >
+                  <FileText className="w-4 h-4 text-emerald-400 shrink-0 group-hover:scale-110 transition-transform" />
+                  <div>
+                    <div className="font-bold text-white group-hover:text-emerald-300">Campaign Notion Wiki</div>
+                    <div className="text-[10px] text-[#78828c] font-mono">Export Markdown Session Logs</div>
+                  </div>
+                </button>
+
+                {/* GM Save & Local Backup */}
+                <div className="border-t border-[#22272d] my-1 pt-1">
+                  <button
+                    onClick={() => {
+                      setIsCompendiumOpen(false);
+                      onOpenGMModal();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-xs font-cinzel text-[#d6d9dc] hover:text-white hover:bg-[#1e2329] transition-colors group"
+                  >
+                    <HardDrive className="w-4 h-4 text-sky-400 shrink-0 group-hover:scale-110 transition-transform" />
+                    <div>
+                      <div className="font-bold text-white group-hover:text-sky-300">GM Save & Local Backup</div>
+                      <div className="text-[10px] text-[#78828c] font-mono">Campaign State Management</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Right: Network Status, Character Switcher & Dice Tray */}
-        <div className="flex items-center gap-2">
-          {/* P2P Multiplayer Button */}
-          <button
-            onClick={onOpenP2PModal}
-            title={statusText}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs font-cinzel transition-all ${
-              isConnected
-                ? 'bg-emerald-950/40 border-emerald-600/50 text-emerald-300 hover:bg-emerald-900/50'
-                : 'bg-[#191c1f] border-[#363d44] text-[#8a929a] hover:text-white hover:border-[#c99a45]/50'
-            }`}
-          >
-            {isConnected ? (
-              <Wifi className="w-3.5 h-3.5 text-emerald-400" />
-            ) : (
-              <WifiOff className="w-3.5 h-3.5 text-[#8a929a]" />
-            )}
-            <span className="hidden sm:inline">
-              {isHost ? 'Host' : isConnected ? 'Joined' : 'P2P Room'}
-            </span>
-            {isConnected && (
-              <span className="bg-emerald-500/20 text-emerald-300 text-[10px] px-1.5 py-0.2 rounded-full border border-emerald-500/30">
-                {totalPlayersInRoom !== undefined
-                  ? `${totalPlayersInRoom}p${observersCount ? ` + ${observersCount}obs` : ''}`
-                  : `${peerCount + (isHost ? 1 : 0)}p`}
-              </span>
-            )}
-          </button>
-
-          {/* GM Local Storage & Backup Button */}
-          <button
-            onClick={onOpenGMModal}
-            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-md bg-[#191c1f] border border-[#2b3136] text-[#a6b1b9] hover:text-white hover:border-[#c99a45] transition-all flex items-center gap-1.5 text-xs font-cinzel"
-            title="Campaign Auto-Save & Local Backup"
-          >
-            <HardDrive className="w-3.5 h-3.5 text-[#c99a45]" />
-            <span className="hidden xl:inline">GM Save</span>
-          </button>
-
-          {/* Switch / Locked Witcher Button */}
+        {/* Right: Character Switcher, P2P Status & Dice Tray */}
+        <div className="flex items-center gap-2 shrink-0">
+          
+          {/* Active Witcher / Role Indicator */}
           <button
             onClick={onOpenCharacterSelect}
-            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-md bg-[#191c1f] border border-[#2b3136] text-[#c99a45] hover:bg-[#252a2f] hover:border-[#c99a45] transition-all flex items-center gap-1.5 text-xs font-cinzel"
+            className="px-2.5 py-1.5 rounded-lg bg-[#16181b] border border-[#2b3137] text-[#c99a45] hover:bg-[#20252b] hover:border-[#c99a45] transition-all flex items-center gap-2 text-xs font-cinzel"
             title={
               isHost
                 ? !gmPlaysWitcher
@@ -218,26 +273,57 @@ export const Navbar: React.FC<NavbarProps> = ({
             ) : (
               <Users className="w-3.5 h-3.5" />
             )}
-            <span className="hidden lg:inline">
+            <span className="hidden md:inline font-bold">
               {isHost && !gmPlaysWitcher
                 ? 'GM (Narrator)'
-                : `${selectedCharacter?.school || 'Select'} Witcher ${
-                    isCharacterLocked && !isHost ? '(Locked)' : ''
-                  }`}
+                : `${selectedCharacter?.school || 'Select'}`}
             </span>
+            {selectedCharacter && (isHost ? gmPlaysWitcher : true) && (
+              <span className="text-[10px] font-mono text-emerald-400 hidden lg:inline">
+                ({selectedCharacter.currentHp} HP)
+              </span>
+            )}
           </button>
 
-          {/* Dice Tray Toggle */}
+          {/* P2P Multiplayer Button */}
+          <button
+            onClick={onOpenP2PModal}
+            title={statusText}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-cinzel transition-all ${
+              isConnected
+                ? 'bg-emerald-950/40 border-emerald-600/50 text-emerald-300 hover:bg-emerald-900/50'
+                : 'bg-[#16181b] border-[#2b3137] text-[#8a929a] hover:text-white hover:border-[#c99a45]/50'
+            }`}
+          >
+            {isConnected ? (
+              <Wifi className="w-3.5 h-3.5 text-emerald-400" />
+            ) : (
+              <WifiOff className="w-3.5 h-3.5 text-[#8a929a]" />
+            )}
+            <span className="hidden sm:inline">
+              {isHost ? 'Host' : isConnected ? 'Joined' : 'P2P'}
+            </span>
+            {isConnected && (
+              <span className="bg-emerald-500/20 text-emerald-300 text-[10px] px-1.5 py-0.2 rounded-full border border-emerald-500/30 font-mono">
+                {totalPlayersInRoom !== undefined
+                  ? `${totalPlayersInRoom}p${observersCount ? ` + ${observersCount}obs` : ''}`
+                  : `${peerCount + (isHost ? 1 : 0)}p`}
+              </span>
+            )}
+          </button>
+
+          {/* Dice Tray Drawer Toggle */}
           <button
             onClick={onToggleDiceTray}
-            className={`p-2 rounded-md border transition-all ${
+            className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border transition-all flex items-center gap-1.5 ${
               isDiceTrayOpen
-                ? 'bg-[#c99a45] text-black border-[#c99a45] shadow-lg shadow-[#c99a45]/30'
-                : 'bg-[#191c1f] border-[#2b3136] text-[#a6b1b9] hover:text-white hover:border-[#c99a45]'
+                ? 'bg-[#c99a45] text-black border-[#c99a45] shadow-lg shadow-[#c99a45]/30 font-bold'
+                : 'bg-[#16181b] border-[#2b3137] text-[#a6b1b9] hover:text-white hover:border-[#c99a45]'
             }`}
-            title="Toggle Dice Roller Tray"
+            title="Toggle Interactive Dice Tray"
           >
             <Dices className="w-4 h-4" />
+            <span className="hidden xl:inline text-xs font-cinzel">Dice</span>
           </button>
         </div>
 
