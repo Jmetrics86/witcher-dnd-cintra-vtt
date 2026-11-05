@@ -1,6 +1,6 @@
 import { WitcherCharacter } from '../types';
 import { getAssetUrl } from '../utils/assets';
-import { STARTER_ARMOR_SETS, MASTER_FINITE_ITEMS, INITIAL_WITCHER_GOLD } from './items';
+import { STARTER_ARMOR_SETS, INITIAL_WITCHER_GOLD } from './items';
 
 export const PREGEN_WITCHERS: WitcherCharacter[] = [
   {
@@ -69,21 +69,9 @@ export const PREGEN_WITCHERS: WitcherCharacter[] = [
       'Cat Eyes: Darkvision 60 ft (120 ft with Cat Potion).',
       'Extra Attack: Can attack twice whenever taking the Attack action.',
     ],
-    potions: [
-      { name: 'Swallow', toxicity: 20, charges: 2, maxCharges: 2, duration: '1 minute (10 rounds)', effect: 'Heals 2d4 + 3 HP at the start of each of your turns.' },
-      { name: 'Thunderbolt', toxicity: 25, charges: 2, maxCharges: 2, duration: '1 minute', effect: 'Add +3 bonus damage to all weapon strikes.' },
-      { name: 'Cat', toxicity: 15, charges: 1, maxCharges: 1, duration: '1 hour', effect: 'Grants 120 ft total darkvision and see-in-magical-darkness.' },
-      { name: 'White Honey', toxicity: 0, charges: 1, maxCharges: 1, duration: 'Instantaneous', effect: 'Immediately clears all Toxicity and ends all active potion effects.' },
-    ],
-    bombs: [
-      { name: 'Grapeshot', count: 2, maxCount: 2, radius: '15 ft sphere', effect: 'Deals 3d8 piercing & fire shrapnel damage (DC 15 Dex save for half).' },
-      { name: 'Moon Dust', count: 2, maxCount: 2, radius: '10 ft sphere', effect: 'Prevents monsters from turning invisible or shifting forms for 1 minute; suppresses regeneration.' },
-    ],
-    oils: [
-      { name: 'Relict Oil', targetCategory: 'Relicts (Leshen, Chort)', bonusDamage: '+1d8 damage', charges: 10, maxCharges: 10 },
-      { name: 'Necrophage Oil', targetCategory: 'Necrophages (Grave Hag, Rotfiends)', bonusDamage: '+1d8 damage', charges: 10, maxCharges: 10 },
-      { name: 'Specter Oil', targetCategory: 'Specters & Hounds', bonusDamage: '+1d8 damage', charges: 10, maxCharges: 10 },
-    ],
+    potions: [],
+    bombs: [],
+    oils: [],
     signs: ['Aard', 'Igni', 'Quen', 'Yrden', 'Axii'],
     backstory: `Taken as a child under the Law of Surprise after his father—a Redanian wheelwright—was saved from a pack of ghouls during the Bitter Winter of 1142, Vane was forged in the high, wind-scoured courtyards of Kaer Morhen. Out of thirty boys in his cohort who drank the mutagenic decoctions during the Trial of the Grasses, only seven opened their eyes again. Vane's eyes burned a fierce, luminous wolf-amber, and his heartbeat slowed to a steady, unshakeable rhythm—one beat every four seconds.
 
@@ -132,7 +120,7 @@ With autumn frost already biting the high passes back to Kaer Morhen, Vane needs
     },
     gold: INITIAL_WITCHER_GOLD,
     equippedArmor: STARTER_ARMOR_SETS.Wolf,
-    inventory: MASTER_FINITE_ITEMS.filter((i) => i.assignedToSchool === 'Wolf'),
+    inventory: [],
   },
   {
     id: 'witcher-cat',
@@ -199,21 +187,9 @@ With autumn frost already biting the high passes back to Kaer Morhen, Vane needs
       'Trial of the Grasses: Resistance to poison; darkvision 60 ft.',
       'Extra Attack: Can attack twice with the main weapon plus once with the off-hand sabre.',
     ],
-    potions: [
-      { name: 'Swallow', toxicity: 20, charges: 2, maxCharges: 2, duration: '1 minute', effect: 'Heals 2d4 + 3 HP at the start of each of your turns.' },
-      { name: 'Thunderbolt', toxicity: 25, charges: 2, maxCharges: 2, duration: '1 minute', effect: 'Add +3 bonus damage to all weapon strikes.' },
-      { name: 'Blizzard', toxicity: 25, charges: 1, maxCharges: 1, duration: '1 minute', effect: 'When you kill an enemy or score a critical, you enter bullet-time: enemies have disadvantage on attacks against you until your next turn.' },
-      { name: 'White Honey', toxicity: 0, charges: 1, maxCharges: 1, duration: 'Instantaneous', effect: 'Clears all Toxicity.' },
-    ],
-    bombs: [
-      { name: 'Samum', count: 2, maxCount: 2, radius: '10 ft sphere', effect: 'Blinding flash of silver salt: Enemies must succeed on DC 16 Con save or be Stunned and Blinded for 1 round.' },
-      { name: 'Dancing Star', count: 1, maxCount: 1, radius: '15 ft sphere', effect: 'Explosive incendiary burst: 4d6 fire damage and ignites the ground for 2 rounds.' },
-    ],
-    oils: [
-      { name: 'Relict Oil', targetCategory: 'Relicts (Leshen, Chort)', bonusDamage: '+1d8 damage', charges: 10, maxCharges: 10 },
-      { name: 'Necrophage Oil', targetCategory: 'Necrophages (Grave Hag, Rotfiends)', bonusDamage: '+1d8 damage', charges: 10, maxCharges: 10 },
-      { name: 'Hanged Man\'s Venom', targetCategory: 'Humanoids & Bandits', bonusDamage: '+1d8 poison damage', charges: 10, maxCharges: 10 },
-    ],
+    potions: [],
+    bombs: [],
+    oils: [],
     signs: ['Aard', 'Igni', 'Quen', 'Yrden', 'Axii'],
     backstory: `Born in the slums of Ebbing and sold to the Caravan of Dyn Marv for a sack of grain, Sybilla survived the Cat School's experimental, unstable Trial of the Grasses—a formula driven using elven alchemical secrets that amplified her nervous system to blinding speed while sharpening rather than dulling her volatile emotions. Where other witcher schools refused women and clung to dusty codes of neutrality, the Cats embraced outcasts, elves, and daughters of the gutter, training them as both monster-slayers and high-born assassins.
 
@@ -262,7 +238,7 @@ She knows how nobles think, how spies lie, and how daggers are hidden behind vel
     },
     gold: INITIAL_WITCHER_GOLD,
     equippedArmor: STARTER_ARMOR_SETS.Cat,
-    inventory: MASTER_FINITE_ITEMS.filter((i) => i.assignedToSchool === 'Cat'),
+    inventory: [],
   },
   {
     id: 'witcher-griffin',
@@ -329,21 +305,9 @@ She knows how nobles think, how spies lie, and how daggers are hidden behind vel
       'Trial of the Grasses: Darkvision 60 ft; disease immunity; poison resistance.',
       'Extra Attack: Can attack twice when taking the Attack action.',
     ],
-    potions: [
-      { name: 'Petri\'s Philter', toxicity: 30, charges: 2, maxCharges: 2, duration: '1 minute', effect: 'Enhances Sign intensity: All signs deal +1d8 extra damage and target saves are at disadvantage.' },
-      { name: 'Tawny Owl', toxicity: 20, charges: 2, maxCharges: 2, duration: '1 minute', effect: 'Regenerates 1 Vigor at the start of each of your turns.' },
-      { name: 'Swallow', toxicity: 20, charges: 2, maxCharges: 2, duration: '1 minute', effect: 'Heals 2d4 + 3 HP each round.' },
-      { name: 'White Honey', toxicity: 0, charges: 1, maxCharges: 1, duration: 'Instantaneous', effect: 'Clears all Toxicity.' },
-    ],
-    bombs: [
-      { name: 'Moon Dust', count: 2, maxCount: 2, radius: '10 ft sphere', effect: 'Prevents shapeshifting/incorporeality; forces monsters into physical form.' },
-      { name: 'Devil\'s Puffball', count: 2, maxCount: 2, radius: '15 ft sphere', effect: 'Dense poison cloud: Deals 3d6 poison damage each round inside the haze (DC 15 Con save).' },
-    ],
-    oils: [
-      { name: 'Relict Oil', targetCategory: 'Relicts (Leshen, Chort)', bonusDamage: '+1d8 damage', charges: 10, maxCharges: 10 },
-      { name: 'Specter Oil', targetCategory: 'Specters & Hounds', bonusDamage: '+1d8 damage', charges: 10, maxCharges: 10 },
-      { name: 'Elementa Oil', targetCategory: 'Golems & Elementals', bonusDamage: '+1d8 damage', charges: 10, maxCharges: 10 },
-    ],
+    potions: [],
+    bombs: [],
+    oils: [],
     signs: ['Aard', 'Igni', 'Quen', 'Yrden', 'Axii'],
     backstory: `High atop the sea-cliffs of Mount Erlenwald in Kovir stands Kaer Seren, the citadel of the School of the Griffin. Founded by knightly witchers who refused to abandon chivalric virtue or arcane scholarship, the Griffins study ancient Elder Speech manuscripts, high-intensity Sign weaving, and royal diplomacy.
 
@@ -392,7 +356,7 @@ Now returning to his ancestral homeland of Cintra for the first time in twenty-f
     },
     gold: INITIAL_WITCHER_GOLD,
     equippedArmor: STARTER_ARMOR_SETS.Griffin,
-    inventory: MASTER_FINITE_ITEMS.filter((i) => i.assignedToSchool === 'Griffin'),
+    inventory: [],
   },
   {
     id: 'witcher-bear',
@@ -457,21 +421,9 @@ Now returning to his ancestral homeland of Cintra for the first time in twenty-f
       'Trial of the Grasses: Darkvision 60 ft; disease immunity; poison resistance.',
       'Extra Attack: Can attack twice when taking the Attack action.',
     ],
-    potions: [
-      { name: 'Swallow', toxicity: 20, charges: 2, maxCharges: 2, duration: '1 minute', effect: 'Heals 2d4 + 3 HP each round.' },
-      { name: 'Thunderbolt', toxicity: 25, charges: 2, maxCharges: 2, duration: '1 minute', effect: 'Adds +3 damage to all weapon attacks.' },
-      { name: 'Maribor Forest', toxicity: 30, charges: 1, maxCharges: 1, duration: '1 minute', effect: 'Immediately generates 2 free Vigor points and increases maximum Vigor by 1.' },
-      { name: 'White Honey', toxicity: 0, charges: 1, maxCharges: 1, duration: 'Instantaneous', effect: 'Clears all Toxicity.' },
-    ],
-    bombs: [
-      { name: 'Grapeshot', count: 2, maxCount: 2, radius: '15 ft sphere', effect: 'Deals 3d8 shrapnel fire & piercing damage (DC 15 Dex save for half).' },
-      { name: 'Northern Wind', count: 1, maxCount: 1, radius: '10 ft sphere', effect: 'Glacial cryo-blast: Targets must succeed DC 15 Con save or be Frozen in ice for 1 round (attacks against frozen targets deal double damage!).' },
-    ],
-    oils: [
-      { name: 'Relict Oil', targetCategory: 'Relicts (Leshen, Chort)', bonusDamage: '+1d8 damage', charges: 10, maxCharges: 10 },
-      { name: 'Beast Oil', targetCategory: 'Beasts & Werewolves', bonusDamage: '+1d8 damage', charges: 10, maxCharges: 10 },
-      { name: 'Ogroid Oil', targetCategory: 'Cyclopes & Trolls', bonusDamage: '+1d8 damage', charges: 10, maxCharges: 10 },
-    ],
+    potions: [],
+    bombs: [],
+    oils: [],
     signs: ['Aard', 'Igni', 'Quen', 'Yrden', 'Axii'],
     backstory: `High in the glacial, storm-lashed peaks of the Amell Mountains stands Haern Caduch, the grim stone fortress of the School of the Bear. Unlike the brotherhood of the Wolves or the knightly fellowship of the Griffins, Bear witchers are forged through brutal isolation. During his final Trial of the Mountain, fourteen-year-old Bram was cast out naked into a blizzard with only a flint knife and told not to return until he wore the pelt of an cave-ursine.
 
@@ -520,6 +472,6 @@ Bram rarely travels with companions—Bear doctrine teaches that relying on anot
     },
     gold: INITIAL_WITCHER_GOLD,
     equippedArmor: STARTER_ARMOR_SETS.Bear,
-    inventory: MASTER_FINITE_ITEMS.filter((i) => i.assignedToSchool === 'Bear'),
+    inventory: [],
   },
 ];

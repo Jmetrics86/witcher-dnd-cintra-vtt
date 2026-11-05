@@ -1,4 +1,5 @@
-import { GameItem, ArmorSet, CampaignEconomyState, WitcherSchool } from '../types';
+import { GameItem, ArmorSet, CampaignEconomyState, WitcherSchool, ActMerchant } from '../types';
+import { getAssetUrl } from '../utils/assets';
 
 export const STARTER_ARMOR_SETS: Record<WitcherSchool, ArmorSet> = {
   Wolf: {
@@ -41,12 +42,30 @@ export const STARTER_ARMOR_SETS: Record<WitcherSchool, ArmorSet> = {
 
 export const DISCOVERY_ARMOR_SETS: ArmorSet[] = [
   {
+    id: 'armor-ox-hide',
+    name: 'Reinforced Ox-Hide Mercenary Brigandine Set',
+    armorClass: 14,
+    weightCategory: 'Medium',
+    perks: ['Reinforced boiled leather with brass rivets', '+1 to Athletics checks', 'Fluid movement with no stealth penalty'],
+    description: 'Sturdy mercenary armor built for hard road marches and close-quarters brawling. Sold by Master Torvin.',
+    valueGold: 110,
+  },
+  {
+    id: 'armor-skellige-chain',
+    name: 'Skellige Ursine-Forged Ring Mail Set',
+    armorClass: 16,
+    weightCategory: 'Heavy',
+    perks: ['Interlocking cold-forged iron rings', 'Reduces bludgeoning damage by 2', 'Thermal wool undergarments'],
+    description: 'Heavy sea-raider armor looted from an An Craite escort. Found in the convoy wreckage.',
+    valueGold: 190,
+  },
+  {
     id: 'armor-cintrian-guard',
     name: 'Cintrian Royal Guard Lion Half-Plate Set',
     armorClass: 16,
     weightCategory: 'Medium',
     perks: ['Advantage on Charisma (Persuasion) checks with Cintrian nobility & soldiers', 'Gilded lion embossed breastplate'],
-    description: 'Ceremonial yet battlefield-hardened plate worn by the Queen\'s elite guard. Recovered from the noble convoy or awarded by Baron Raymond.',
+    description: 'Ceremonial yet battlefield-hardened plate worn by the Queen\'s elite guard. Carried by the royal vanguard quartermaster.',
     valueGold: 220,
   },
   {
@@ -55,8 +74,8 @@ export const DISCOVERY_ARMOR_SETS: ArmorSet[] = [
     armorClass: 15,
     weightCategory: 'Light',
     perks: ['Weightless spun Aen Elle silk', 'Resistance to Cold and Necrotic damage', 'Advantage on saves vs fairy & specter magic'],
-    description: 'An otherworldly armor crafted in Tir ná Lia centuries before the Conjunction. Found entombed in the deepest sarcophagus of the Elidyr Barrow.',
-    valueGold: 350,
+    description: 'An otherworldly armor crafted in Tir ná Lia centuries before the Conjunction. Recovered by black market barrow delvers.',
+    valueGold: 320,
   },
 ];
 
@@ -66,9 +85,9 @@ export const armorSetToGameItem = (armor: ArmorSet, assignedToSchool?: WitcherSc
   name: armor.name,
   category: 'armor',
   description: armor.description,
-  rarity: armor.id.includes('tir-na-lia') ? 'Relic' : armor.id.includes('cintrian') ? 'Masterwork' : 'Witcher',
+  rarity: armor.id.includes('tir-na-lia') ? 'Relic' : armor.id.includes('cintrian') || armor.id.includes('skellige') ? 'Masterwork' : armor.id.includes('ox-hide') ? 'Common' : 'Witcher',
   valueGold: armor.valueGold,
-  equipped: assignedToSchool !== 'DM_VAULT',
+  equipped: assignedToSchool !== undefined && assignedToSchool !== 'DM_VAULT',
   armorClass: armor.armorClass,
   weightCategory: armor.weightCategory,
   properties: armor.perks,
@@ -83,9 +102,11 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
   armorSetToGameItem(STARTER_ARMOR_SETS.Griffin, 'Griffin'),
   armorSetToGameItem(STARTER_ARMOR_SETS.Bear, 'Bear'),
 
-  // --- DISCOVERY ARMOR SETS (In DM Vault) ---
+  // --- DISCOVERY ARMOR SETS (In DM Vault & Merchants) ---
   armorSetToGameItem(DISCOVERY_ARMOR_SETS[0], 'DM_VAULT'),
   armorSetToGameItem(DISCOVERY_ARMOR_SETS[1], 'DM_VAULT'),
+  armorSetToGameItem(DISCOVERY_ARMOR_SETS[2], 'DM_VAULT'),
+  armorSetToGameItem(DISCOVERY_ARMOR_SETS[3], 'DM_VAULT'),
 
   // --- STEEL SWORDS ---
   {
@@ -146,6 +167,20 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
   },
 
   // Steel Swords in DM Vault (Discoverable by exploring / combat / rewards)
+  {
+    id: 'steel-cintrian-dirk',
+    name: 'Cintrian Tempered Steel Dirk',
+    category: 'steel_sword',
+    description: 'A sharp, quick-drawing auxiliary steel dagger crafted for close scrums and surprise thrusts.',
+    rarity: 'Common',
+    valueGold: 65,
+    damage: '1d6 + Dex',
+    damageType: 'Piercing / Slashing',
+    attackBonus: 7,
+    properties: ['Finesse', 'Light', '+1 to Initiative rolls'],
+    assignedToSchool: 'DM_VAULT',
+    discoverySource: 'Sold by Master Torvin Ironfoot at the Lion & Lily tavern',
+  },
   {
     id: 'steel-mahakaman',
     name: 'Mahakaman Clan Carbon Steel Blade',
@@ -251,7 +286,22 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
     assignedToSchool: 'Bear',
   },
 
-  // Silver Swords in DM Vault (Discoverable / Awarded)
+  // Silver Swords in DM Vault & Merchants (Discoverable / Awarded / Sold)
+  {
+    id: 'silver-havern-greatsword',
+    name: 'Havern Silver Broadsword',
+    category: 'silver_sword',
+    description: 'A balanced Mahakaman silver weapon inlaid with runic wards against ghouls and barrow wraiths.',
+    rarity: 'Masterwork',
+    valueGold: 210,
+    damage: '1d8 + 1 + Str/Dex (+2d6 silver vs monsters)',
+    damageType: 'Silver / Slashing',
+    attackBonus: 7,
+    isSilver: true,
+    properties: ['Versatile', 'Mahakaman Silver Core (+1 damage vs cursed beings)'],
+    assignedToSchool: 'DM_VAULT',
+    discoverySource: 'Sold by Herbalist Maeve in Act II or recovered from caravan salvage',
+  },
   {
     id: 'silver-moonblade',
     name: 'Moonblade Ancient Elven Silver Relic',
@@ -311,7 +361,8 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
     toxicity: 20,
     duration: '3 rounds',
     effect: 'Heals 2d4 + 3 HP each turn (+20 Toxicity)',
-    assignedToSchool: 'Wolf',
+    assignedToSchool: 'DM_VAULT',
+    discoverySource: 'Sold by Master Torvin Ironfoot in Act I',
   },
   {
     id: 'potion-swallow-2',
@@ -325,7 +376,8 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
     toxicity: 20,
     duration: '3 rounds',
     effect: 'Heals 2d4 + 3 HP each turn (+20 Toxicity)',
-    assignedToSchool: 'Griffin',
+    assignedToSchool: 'DM_VAULT',
+    discoverySource: 'Sold by Sergeant Verek in Act IV',
   },
   {
     id: 'potion-swallow-3',
@@ -340,7 +392,7 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
     duration: '3 rounds',
     effect: 'Heals 2d4 + 3 HP each turn (+20 Toxicity)',
     assignedToSchool: 'DM_VAULT',
-    discoverySource: 'Found in roadside apothecary kit',
+    discoverySource: 'Found in the bailiff\'s secret discretionary purse in Act I',
   },
   {
     id: 'potion-swallow-4',
@@ -355,7 +407,7 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
     duration: '3 rounds',
     effect: 'Heals 2d4 + 3 HP each turn (+20 Toxicity)',
     assignedToSchool: 'DM_VAULT',
-    discoverySource: 'Found in wagon cargo',
+    discoverySource: 'Found in the ambushed convoy medical chest in Act II',
   },
   {
     id: 'potion-thunderbolt-1',
@@ -369,7 +421,8 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
     toxicity: 25,
     duration: '1 minute',
     effect: '+3 bonus damage to all attacks (+25 Toxicity)',
-    assignedToSchool: 'Wolf',
+    assignedToSchool: 'DM_VAULT',
+    discoverySource: 'Sold by Herbalist Maeve in Act II',
   },
   {
     id: 'potion-thunderbolt-2',
@@ -383,7 +436,8 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
     toxicity: 25,
     duration: '1 minute',
     effect: '+3 bonus damage to all attacks (+25 Toxicity)',
-    assignedToSchool: 'Bear',
+    assignedToSchool: 'DM_VAULT',
+    discoverySource: 'Discovered in a concealed barrow cache in Act II',
   },
   {
     id: 'potion-thunderbolt-3',
@@ -411,7 +465,8 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
     toxicity: 15,
     duration: '1 hour',
     effect: '120 ft Darkvision & see invisible (+15 Toxicity)',
-    assignedToSchool: 'Cat',
+    assignedToSchool: 'DM_VAULT',
+    discoverySource: 'Sold by Herbalist Maeve in Act II',
   },
   {
     id: 'potion-cat-2',
@@ -439,7 +494,8 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
     toxicity: 45,
     duration: 'Instantaneous',
     effect: 'Instantly restores 4d8 + 4 HP (+45 Toxicity)',
-    assignedToSchool: 'Bear',
+    assignedToSchool: 'DM_VAULT',
+    discoverySource: 'Sold by "Blind" Lucian the smuggler in Act III',
   },
   {
     id: 'potion-white-raffard-2',
@@ -454,7 +510,7 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
     duration: 'Instantaneous',
     effect: 'Instantly restores 4d8 + 4 HP (+45 Toxicity)',
     assignedToSchool: 'DM_VAULT',
-    discoverySource: 'Found in Corvus\'s personal chest',
+    discoverySource: 'Found in the secret sarcophagus of Queen Eilidh in Act III',
   },
   {
     id: 'potion-tawny-owl-1',
@@ -468,7 +524,8 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
     toxicity: 20,
     duration: '1 minute',
     effect: '+1 Vigor regeneration each round (+20 Toxicity)',
-    assignedToSchool: 'Griffin',
+    assignedToSchool: 'DM_VAULT',
+    discoverySource: 'Sold by "Blind" Lucian in Act III',
   },
   {
     id: 'potion-tawny-owl-2',
@@ -496,7 +553,8 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
     toxicity: 0,
     duration: 'Instantaneous',
     effect: 'Flushes Toxicity to 0 (0 Toxicity)',
-    assignedToSchool: 'Wolf',
+    assignedToSchool: 'DM_VAULT',
+    discoverySource: 'Sold by Master Torvin Ironfoot in Act I',
   },
   {
     id: 'potion-white-honey-2',
@@ -510,7 +568,23 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
     toxicity: 0,
     duration: 'Instantaneous',
     effect: 'Flushes Toxicity to 0 (0 Toxicity)',
-    assignedToSchool: 'Cat',
+    assignedToSchool: 'DM_VAULT',
+    discoverySource: 'Sold by Sergeant Verek in Act IV',
+  },
+  {
+    id: 'potion-blizzard-1',
+    name: 'Blizzard Potion (Phial #1)',
+    category: 'potion',
+    description: 'Hyper-accelerates visual and neural reflexes. Slaying a foe slows perception of time, granting +2 AC and an immediate free Reaction until the end of next turn.',
+    rarity: 'Relic',
+    valueGold: 55,
+    charges: 2,
+    maxCharges: 2,
+    toxicity: 30,
+    duration: '1 minute',
+    effect: '+2 AC and free Reaction upon killing any foe (+30 Toxicity)',
+    assignedToSchool: 'DM_VAULT',
+    discoverySource: 'Sold by Sergeant Verek in Act IV or hidden in the Hollow Roots',
   },
 
   // --- FINITE BOMBS ---
@@ -520,11 +594,12 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
     category: 'bomb',
     description: 'Ignites iron nails and silver scrap in a 15-ft radius. Deals 3d8 piercing & fire shrapnel damage.',
     rarity: 'Common',
-    valueGold: 25,
+    valueGold: 30,
     charges: 2,
     maxCharges: 2,
     effect: '3d8 damage in 15 ft radius (DC 14 Dex half)',
-    assignedToSchool: 'Wolf',
+    assignedToSchool: 'DM_VAULT',
+    discoverySource: 'Sold by Master Torvin Ironfoot in Act I',
   },
   {
     id: 'bomb-grapeshot-2',
@@ -532,11 +607,12 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
     category: 'bomb',
     description: 'Ignites iron nails and silver scrap in a 15-ft radius. Deals 3d8 piercing & fire shrapnel damage.',
     rarity: 'Common',
-    valueGold: 25,
+    valueGold: 30,
     charges: 2,
     maxCharges: 2,
     effect: '3d8 damage in 15 ft radius (DC 14 Dex half)',
-    assignedToSchool: 'Bear',
+    assignedToSchool: 'DM_VAULT',
+    discoverySource: 'Stashed under the loose tavern floorboard in Act I',
   },
   {
     id: 'bomb-moon-dust-1',
@@ -548,7 +624,8 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
     charges: 2,
     maxCharges: 2,
     effect: 'Prevents transformation/invisibility for 1 min',
-    assignedToSchool: 'Wolf',
+    assignedToSchool: 'DM_VAULT',
+    discoverySource: 'Sold by Herbalist Maeve in Act II',
   },
   {
     id: 'bomb-moon-dust-2',
@@ -561,6 +638,7 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
     maxCharges: 2,
     effect: 'Prevents transformation/invisibility for 1 min',
     assignedToSchool: 'DM_VAULT',
+    discoverySource: 'Found in the ambushed convoy cargo cart in Act II',
   },
   {
     id: 'bomb-dancing-star-1',
@@ -572,7 +650,8 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
     charges: 2,
     maxCharges: 2,
     effect: '4d6 fire + burning for 2 rounds',
-    assignedToSchool: 'Cat',
+    assignedToSchool: 'DM_VAULT',
+    discoverySource: 'Sold by "Blind" Lucian in Act III',
   },
   {
     id: 'bomb-dimeritium-1',
@@ -580,12 +659,12 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
     category: 'bomb',
     description: 'Releases dimeritium ore powder in a 20-ft sphere. Completely suppresses all spells, Signs, and magical teleportation.',
     rarity: 'Relic',
-    valueGold: 70,
+    valueGold: 65,
     charges: 2,
     maxCharges: 2,
     effect: 'Suppresses magic and Signs for 3 rounds',
     assignedToSchool: 'DM_VAULT',
-    discoverySource: 'Found in Sir Danek\'s classified cargo',
+    discoverySource: 'Sold by Sergeant Verek in Act IV',
   },
 
   // --- FINITE OILS ---
@@ -599,7 +678,8 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
     charges: 10,
     maxCharges: 10,
     effect: '+1d8 damage vs Relicts for 10 strikes',
-    assignedToSchool: 'Wolf',
+    assignedToSchool: 'DM_VAULT',
+    discoverySource: 'Gifted by Kaelan the woodsman in Act I',
   },
   {
     id: 'oil-specter-1',
@@ -611,7 +691,8 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
     charges: 10,
     maxCharges: 10,
     effect: '+1d8 damage vs Specters for 10 strikes',
-    assignedToSchool: 'Griffin',
+    assignedToSchool: 'DM_VAULT',
+    discoverySource: 'Sold by Herbalist Maeve in Act II',
   },
   {
     id: 'oil-necrophage-1',
@@ -619,11 +700,12 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
     category: 'oil',
     description: 'Applied to a silver sword. Adds +1d8 damage against Ghouls, Alghouls, and Grave Hags.',
     rarity: 'Common',
-    valueGold: 30,
+    valueGold: 35,
     charges: 10,
     maxCharges: 10,
     effect: '+1d8 damage vs Necrophages for 10 strikes',
-    assignedToSchool: 'Cat',
+    assignedToSchool: 'DM_VAULT',
+    discoverySource: 'Sold by "Blind" Lucian in Act III',
   },
   {
     id: 'oil-hanged-man-1',
@@ -636,6 +718,34 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
     maxCharges: 10,
     effect: '+1d8 poison damage vs Humanoids for 10 strikes',
     assignedToSchool: 'DM_VAULT',
+  },
+
+  // --- FINITE GEAR & FIELD TOOLS ---
+  {
+    id: 'gear-dwarven-whetstone-1',
+    name: 'Mahakaman Dwarven Whetstone (Piece #1)',
+    category: 'gear',
+    description: 'High-grit mineral whetstone from Mount Carbon. Honing a blade grants +1 bonus damage on all weapon strikes during the next combat encounter.',
+    rarity: 'Common',
+    valueGold: 15,
+    charges: 1,
+    maxCharges: 1,
+    effect: '+1 weapon damage for next combat encounter',
+    assignedToSchool: 'DM_VAULT',
+    discoverySource: 'Sold by Master Torvin Ironfoot in Act I',
+  },
+  {
+    id: 'gear-dwarven-whetstone-2',
+    name: 'Mahakaman Dwarven Whetstone (Piece #2)',
+    category: 'gear',
+    description: 'High-grit mineral whetstone from Mount Carbon. Honing a blade grants +1 bonus damage on all weapon strikes during the next combat encounter.',
+    rarity: 'Common',
+    valueGold: 15,
+    charges: 1,
+    maxCharges: 1,
+    effect: '+1 weapon damage for next combat encounter',
+    assignedToSchool: 'DM_VAULT',
+    discoverySource: 'Sold by Master Torvin Ironfoot in Act I',
   },
 
   // --- QUEST, EXPLORATION & ROLEPLAY RELICS ---
@@ -691,14 +801,272 @@ export const MASTER_FINITE_ITEMS: GameItem[] = [
   },
 ];
 
+// Helper to look up an item from the master catalog
+const findMasterItem = (id: string): GameItem => {
+  const found = MASTER_FINITE_ITEMS.find((it) => it.id === id);
+  if (!found) {
+    throw new Error(`Master item not found: ${id}`);
+  }
+  return found;
+};
+
+// --- DEFAULT ACT MERCHANTS (Finite stock, non-duplicative, distinct personality) ---
+export const DEFAULT_ACT_MERCHANTS: Record<number, ActMerchant> = {
+  1: {
+    actNumber: 1,
+    name: 'Master Torvin Ironfoot',
+    title: 'Mahakaman Traveling Dwarven Smith & Waystation Quartermaster',
+    location: 'Lion & Lily Tavern Courtyard, Sodden Crossroads',
+    avatarUrl: getAssetUrl('assets/tokens/torvin_smith.jpg'),
+    greeting: 'Looking for dependable Mahakaman steel or field supplies before braving the mist? Torvin\'s forge doesn\'t sell junk. Hard orens buy hard steel.',
+    lore: 'A veteran clan smith from Mount Carbon who contracts with traveling mercenaries and Cintrian rangers. He carries field-tested armor, balanced blades, and fresh alchemical concoctions brewed by local hedge-witches.',
+    items: [
+      {
+        id: 'armor-ox-hide',
+        item: findMasterItem('armor-ox-hide'),
+        priceGold: 110,
+        stock: 1,
+        maxStock: 1,
+        merchantNote: 'Riveted boiled leather from Redanian oxen. Light enough to dance in, thick enough to deflect a wolf claw.',
+      },
+      {
+        id: 'steel-cintrian-dirk',
+        item: findMasterItem('steel-cintrian-dirk'),
+        priceGold: 65,
+        stock: 1,
+        maxStock: 1,
+        merchantNote: 'Balanced Mahakaman carbon edge. Fast as a viper when a ghoul gets too close inside sword-length.',
+      },
+      {
+        id: 'potion-swallow-1',
+        item: findMasterItem('potion-swallow-1'),
+        priceGold: 35,
+        stock: 1,
+        maxStock: 1,
+        merchantNote: 'Freshly distilled celandine extract. Closes lacerations while you fight.',
+      },
+      {
+        id: 'potion-white-honey-1',
+        item: findMasterItem('potion-white-honey-1'),
+        priceGold: 20,
+        stock: 1,
+        maxStock: 1,
+        merchantNote: 'Purges blood toxicity in seconds. Don\'t drink five elixirs without keeping this handy.',
+      },
+      {
+        id: 'bomb-grapeshot-1',
+        item: findMasterItem('bomb-grapeshot-1'),
+        priceGold: 30,
+        stock: 1,
+        maxStock: 1,
+        merchantNote: 'Packed with iron filings and saltpeter. Shreds ghoul packs in close quarters.',
+      },
+      {
+        id: 'gear-dwarven-whetstone-1',
+        item: findMasterItem('gear-dwarven-whetstone-1'),
+        priceGold: 15,
+        stock: 2,
+        maxStock: 2,
+        merchantNote: 'Mahakaman fine-grain emery stone. Keeps an edge keen for the next brawl (+1 damage).',
+      },
+    ],
+  },
+  2: {
+    actNumber: 2,
+    name: 'Herbalist Maeve & Caravan Survivor Yann',
+    title: 'Blackwood Forager & Refugee Provisioners',
+    location: 'Perimeter of the Ambushed Convoy, Blackwood Verges',
+    avatarUrl: getAssetUrl('assets/tokens/herbalist_maeve.jpg'),
+    greeting: 'The primeval forest has turned hostile, Witcher. The sap smells of old blood and copper. If you mean to follow Sir Danek\'s bloody tracks to the barrows, take these specter oils and silver.',
+    lore: 'Maeve survived the caravan ambush by hiding in a hollow elder-willow. With Yann\'s help, she gathered salvage from the intact wagons and foraged rare barrow-lichens before the rotfiends could feast.',
+    items: [
+      {
+        id: 'steel-mahakaman',
+        item: findMasterItem('steel-mahakaman'),
+        priceGold: 175,
+        stock: 1,
+        maxStock: 1,
+        merchantNote: 'Folded twenty-four times in the clan furnaces. Clean bite that causes bleeding wounds on critical strikes.',
+      },
+      {
+        id: 'silver-havern-greatsword',
+        item: findMasterItem('silver-havern-greatsword'),
+        priceGold: 210,
+        stock: 1,
+        maxStock: 1,
+        merchantNote: 'Inlaid with pure silver filaments. Slices through cursed marrow like sun through autumn mist.',
+      },
+      {
+        id: 'potion-thunderbolt-1',
+        item: findMasterItem('potion-thunderbolt-1'),
+        priceGold: 40,
+        stock: 1,
+        maxStock: 1,
+        merchantNote: 'Adrenaline surged with kortinari root. Makes every sword stroke hit with bone-snapping force.',
+      },
+      {
+        id: 'potion-cat-1',
+        item: findMasterItem('potion-cat-1'),
+        priceGold: 30,
+        stock: 1,
+        maxStock: 1,
+        merchantNote: 'Expands the pupils to track movement in subterranean blackness.',
+      },
+      {
+        id: 'oil-specter-1',
+        item: findMasterItem('oil-specter-1'),
+        priceGold: 40,
+        stock: 1,
+        maxStock: 1,
+        merchantNote: 'Essential for the barrows ahead. Coagulates ectoplasm into solid target matter.',
+      },
+      {
+        id: 'bomb-moon-dust-1',
+        item: findMasterItem('bomb-moon-dust-1'),
+        priceGold: 45,
+        stock: 1,
+        maxStock: 1,
+        merchantNote: 'Silver-salt cloud suppresses supernatural shape-shifting and monster regeneration.',
+      },
+    ],
+  },
+  3: {
+    actNumber: 3,
+    name: '"Blind" Lucian',
+    title: 'Black Market Antiquities Smuggler & Barrow Delver',
+    location: 'Hidden Excavation Trench behind the Barrow of Elidyr',
+    avatarUrl: getAssetUrl('assets/tokens/smuggler_lucian.jpg'),
+    greeting: 'Speak low, mutant. The barrow wraiths listen through the limestone. Danek\'s knights thought they could rob Queen Calanthe\'s heritage, but they left in terror. I only trade in hard orens.',
+    lore: 'A ruthless antiquities fence operating from the forgotten military saps beneath the burial mounds. He has unearthed relics of ancient Tir ná Lia and contraband concoctions forbidden in Cintrian cities.',
+    items: [
+      {
+        id: 'armor-tir-na-lia',
+        item: findMasterItem('armor-tir-na-lia'),
+        priceGold: 320,
+        stock: 1,
+        maxStock: 1,
+        merchantNote: 'Weightless spun moon-silk from the ancient Aen Elle. Wards against necrotic chill and fairy curses.',
+      },
+      {
+        id: 'steel-gwyhyr',
+        item: findMasterItem('steel-gwyhyr'),
+        priceGold: 340,
+        stock: 1,
+        maxStock: 1,
+        merchantNote: 'Gnomish masterpiece from Tir Tochair. The edge is so fine it sings in the air; crits on 19-20.',
+      },
+      {
+        id: 'potion-white-raffard-1',
+        item: findMasterItem('potion-white-raffard-1'),
+        priceGold: 65,
+        stock: 1,
+        maxStock: 1,
+        merchantNote: 'Severe trauma draught. Re-knits punctured lungs and shattered ribs instantaneously.',
+      },
+      {
+        id: 'potion-tawny-owl-1',
+        item: findMasterItem('potion-tawny-owl-1'),
+        priceGold: 45,
+        stock: 1,
+        maxStock: 1,
+        merchantNote: 'Spurs Vigor circulation so your magical Signs recharge every turn.',
+      },
+      {
+        id: 'bomb-dancing-star-1',
+        item: findMasterItem('bomb-dancing-star-1'),
+        priceGold: 50,
+        stock: 1,
+        maxStock: 1,
+        merchantNote: 'Alchemical fire bomb. Roars in a 15-ft radius, setting foliage and beast-fur ablaze.',
+      },
+      {
+        id: 'oil-necrophage-1',
+        item: findMasterItem('oil-necrophage-1'),
+        priceGold: 35,
+        stock: 1,
+        maxStock: 1,
+        merchantNote: 'Fatal against grave hags, rotfiends, and carrion ghouls.',
+      },
+    ],
+  },
+  4: {
+    actNumber: 4,
+    name: 'Sergeant Verek of the Blue Banner',
+    title: 'Cintrian Vanguard Quartermaster & Siege Engineer',
+    location: 'Forward Entrenchment Camp, Primeval Heart-Tree Verges',
+    avatarUrl: getAssetUrl('assets/tokens/quartermaster_verek.jpg'),
+    greeting: 'By Queen Calanthe\'s decree, all military stores are opened for the witcher contract. The Leshen has swallowed two of our scout patrols. Take our royal half-plate and silver before the branches close around us.',
+    lore: 'Sergeant Verek commands the last surviving royal supply wagon fortifying the outer perimeter of the Heart-Tree grove. His stocks feature Cintrian palace armaments and high-potency witcher supplies requisitioned for the queen\'s marshals.',
+    items: [
+      {
+        id: 'armor-cintrian-guard',
+        item: findMasterItem('armor-cintrian-guard'),
+        priceGold: 220,
+        stock: 1,
+        maxStock: 1,
+        merchantNote: 'Gilded lion half-plate issued to the Queen\'s elite champions. Medium armor class 16.',
+      },
+      {
+        id: 'steel-cintrian-sabre',
+        item: findMasterItem('steel-cintrian-sabre'),
+        priceGold: 210,
+        stock: 1,
+        maxStock: 1,
+        merchantNote: 'Sir Danek\'s ceremonial cavalry blade. Swift disarming balance with +1 to initiative.',
+      },
+      {
+        id: 'silver-tor-zireael',
+        item: findMasterItem('silver-tor-zireael'),
+        priceGold: 360,
+        stock: 1,
+        maxStock: 1,
+        merchantNote: 'Ancient swallow blade that coats wounds in anti-regenerative silver salt. Shuts down the Leshen\'s self-healing.',
+      },
+      {
+        id: 'potion-blizzard-1',
+        item: findMasterItem('potion-blizzard-1'),
+        priceGold: 55,
+        stock: 1,
+        maxStock: 1,
+        merchantNote: 'Legendary elixir that slows perception of time when you fell a foe. Grants +2 AC and a free Reaction.',
+      },
+      {
+        id: 'potion-swallow-2',
+        item: findMasterItem('potion-swallow-2'),
+        priceGold: 35,
+        stock: 1,
+        maxStock: 1,
+        merchantNote: 'High-purity reserve swallow phial. Essential before charging into the Leshen\'s root sanctuary.',
+      },
+      {
+        id: 'bomb-dimeritium-1',
+        item: findMasterItem('bomb-dimeritium-1'),
+        priceGold: 65,
+        stock: 1,
+        maxStock: 1,
+        merchantNote: 'Suppresses all supernatural magic, teleports, and spirit conjurations in a 20-ft radius.',
+      },
+      {
+        id: 'potion-white-honey-2',
+        item: findMasterItem('potion-white-honey-2'),
+        priceGold: 20,
+        stock: 1,
+        maxStock: 1,
+        merchantNote: 'Instantaneous toxicity detox. Drink this when combined elixirs bring you near the threshold.',
+      },
+    ],
+  },
+};
+
 // Initial Economy State
 export const TOTAL_CAMPAIGN_GOLD = 1500;
-export const INITIAL_WITCHER_GOLD = 35; // 35 * 4 = 140 gold held by party
-export const INITIAL_DM_VAULT_GOLD = TOTAL_CAMPAIGN_GOLD - (INITIAL_WITCHER_GOLD * 4); // 1360 in vault
+export const INITIAL_WITCHER_GOLD = 15; // 15 * 4 = 60 gold held by party (Low starting gold!)
+export const INITIAL_DM_VAULT_GOLD = TOTAL_CAMPAIGN_GOLD - (INITIAL_WITCHER_GOLD * 4); // 1440 in vault
 
 export const INITIAL_ECONOMY_STATE: CampaignEconomyState = {
   totalRealmGold: TOTAL_CAMPAIGN_GOLD,
   dmVaultGold: INITIAL_DM_VAULT_GOLD,
   vaultItems: MASTER_FINITE_ITEMS.filter((i) => i.assignedToSchool === 'DM_VAULT'),
   rewardLog: [],
+  actMerchants: DEFAULT_ACT_MERCHANTS,
 };

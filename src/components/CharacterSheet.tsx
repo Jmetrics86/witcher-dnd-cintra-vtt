@@ -1024,33 +1024,39 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {character.potions.map((potion, idx) => (
-                  <div 
-                    key={potion.name}
-                    className="p-3.5 rounded-xl border border-[#2b3137] bg-[#16181b] flex items-center justify-between gap-3"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-cinzel text-sm font-bold text-white">{potion.name}</span>
-                        <span className="text-[10px] font-mono text-lime-400 bg-lime-950/40 px-1.5 py-0.5 rounded border border-lime-500/30">
-                          +{potion.toxicity}% Tox
-                        </span>
-                      </div>
-                      <p className="text-xs text-[#8a929a] mt-1">{potion.effect}</p>
-                      <div className="text-[10px] text-[#6b737d] font-mono mt-0.5">Charges: {potion.charges}/{potion.maxCharges}</div>
-                    </div>
-
-                    <button
-                      onClick={() => handleDrinkPotion(idx)}
-                      disabled={potion.charges <= 0}
-                      className="px-3 py-1.5 bg-emerald-900/60 hover:bg-emerald-800 border border-emerald-500/50 text-emerald-300 text-xs font-cinzel rounded-md transition-all shrink-0 disabled:opacity-40"
+              {(character.potions || []).length === 0 ? (
+                <div className="p-4 rounded-xl border border-dashed border-[#282d33] bg-[#121416]/50 text-center text-xs text-[#717a85] font-cormorant italic">
+                  No elixirs in pouch. Witchers start with empty phials and must purchase potions from Act merchants, discover hidden apothecary stashes, or brew during meditation.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {character.potions.map((potion, idx) => (
+                    <div 
+                      key={potion.name}
+                      className="p-3.5 rounded-xl border border-[#2b3137] bg-[#16181b] flex items-center justify-between gap-3"
                     >
-                      Quaff
-                    </button>
-                  </div>
-                ))}
-              </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-cinzel text-sm font-bold text-white">{potion.name}</span>
+                          <span className="text-[10px] font-mono text-lime-400 bg-lime-950/40 px-1.5 py-0.5 rounded border border-lime-500/30">
+                            +{potion.toxicity}% Tox
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#8a929a] mt-1">{potion.effect}</p>
+                        <div className="text-[10px] text-[#6b737d] font-mono mt-0.5">Charges: {potion.charges}/{potion.maxCharges}</div>
+                      </div>
+
+                      <button
+                        onClick={() => handleDrinkPotion(idx)}
+                        disabled={potion.charges <= 0}
+                        className="px-3 py-1.5 bg-emerald-900/60 hover:bg-emerald-800 border border-emerald-500/50 text-emerald-300 text-xs font-cinzel rounded-md transition-all shrink-0 disabled:opacity-40"
+                      >
+                        Quaff
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Bombs & Blade Oils */}
@@ -1062,25 +1068,31 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
                   <Bomb className="w-4 h-4 text-amber-400" />
                   <span>Witcher Bombs</span>
                 </h3>
-                <div className="space-y-2.5">
-                  {character.bombs.map((bomb) => (
-                    <div key={bomb.name} className="p-3 rounded-lg border border-[#262b31] bg-[#121416]">
-                      <div className="flex items-center justify-between">
-                        <span className="font-cinzel font-bold text-white text-xs">{bomb.name}</span>
-                        <button
-                          onClick={() => {
-                            onRollDice(`${character.name} hurled a ${bomb.name} bomb`, '3d8', 0);
-                            onAddLogMessage(`${character.name} tossed a ${bomb.name} bomb! Radius: ${bomb.radius}. Effect: ${bomb.effect}`, 'combat');
-                          }}
-                          className="text-[10px] bg-amber-900/50 hover:bg-amber-800 text-amber-200 px-2 py-0.5 rounded border border-amber-600/40 font-cinzel"
-                        >
-                          Hurl Bomb
-                        </button>
+                {(character.bombs || []).length === 0 ? (
+                  <div className="p-3.5 rounded-lg border border-dashed border-[#262b31] bg-[#101214]/50 text-center text-xs text-[#717a85] font-cormorant italic">
+                    No bombs ready. Acquire silver-salt and shrapnel packs from merchants and secret caches.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {character.bombs.map((bomb) => (
+                      <div key={bomb.name} className="p-3 rounded-lg border border-[#262b31] bg-[#121416]">
+                        <div className="flex items-center justify-between">
+                          <span className="font-cinzel font-bold text-white text-xs">{bomb.name}</span>
+                          <button
+                            onClick={() => {
+                              onRollDice(`${character.name} hurled a ${bomb.name} bomb`, '3d8', 0);
+                              onAddLogMessage(`${character.name} tossed a ${bomb.name} bomb! Radius: ${bomb.radius}. Effect: ${bomb.effect}`, 'combat');
+                            }}
+                            className="text-[10px] bg-amber-900/50 hover:bg-amber-800 text-amber-200 px-2 py-0.5 rounded border border-amber-600/40 font-cinzel"
+                          >
+                            Hurl Bomb
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-[#8a929a] mt-1">{bomb.effect}</p>
                       </div>
-                      <p className="text-[11px] text-[#8a929a] mt-1">{bomb.effect}</p>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Blade Oils */}
@@ -1089,19 +1101,25 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
                   <Sword className="w-4 h-4 text-sky-400" />
                   <span>Blade Oils</span>
                 </h3>
-                <div className="space-y-2.5">
-                  {character.oils.map((oil) => (
-                    <div key={oil.name} className="p-3 rounded-lg border border-[#262b31] bg-[#121416]">
-                      <div className="flex items-center justify-between">
-                        <span className="font-cinzel font-bold text-white text-xs">{oil.name}</span>
-                        <span className="text-[10px] text-sky-300 font-mono bg-sky-950/40 px-1.5 py-0.2 rounded border border-sky-500/30">
-                          {oil.bonusDamage}
-                        </span>
+                {(character.oils || []).length === 0 ? (
+                  <div className="p-3.5 rounded-lg border border-dashed border-[#262b31] bg-[#101214]/50 text-center text-xs text-[#717a85] font-cormorant italic">
+                    No blade oils prepared. Forage herbs or purchase oils from Act herbalists.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {character.oils.map((oil) => (
+                      <div key={oil.name} className="p-3 rounded-lg border border-[#262b31] bg-[#121416]">
+                        <div className="flex items-center justify-between">
+                          <span className="font-cinzel font-bold text-white text-xs">{oil.name}</span>
+                          <span className="text-[10px] text-sky-300 font-mono bg-sky-950/40 px-1.5 py-0.2 rounded border border-sky-500/30">
+                            {oil.bonusDamage}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[#8a929a] mt-0.5">Effective against: {oil.targetCategory}</p>
                       </div>
-                      <p className="text-[11px] text-[#8a929a] mt-0.5">Effective against: {oil.targetCategory}</p>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
             </div>

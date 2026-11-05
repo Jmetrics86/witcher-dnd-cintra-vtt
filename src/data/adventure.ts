@@ -216,8 +216,8 @@ Suddenly, the iron latch screams as the heavy cross-timber doors bang wide again
             {
               name: 'Loose Floorboard behind Ale Barrels',
               discoveryCheck: 'DC 13 Perception (Hearing)',
-              reward: '🪙 20 Cintrian Orens & Grapeshot Bomb (Pack #1)',
-              vaultItemId: 'bomb-grapeshot-1',
+              reward: '🪙 20 Cintrian Orens & Grapeshot Bomb (Pack #2)',
+              vaultItemId: 'bomb-grapeshot-2',
               lore: 'Stashed poacher contraband left behind by a scout who fled the Blackwood after hearing the Chort\'s roar.',
             },
           ],
@@ -590,9 +590,9 @@ Even stranger, beside the lead wagon lies the corpse of Captain Vester, commande
             {
               name: 'Captain Vester\'s Hidden Wagon Cache',
               discoveryCheck: 'DC 14 Investigation under the wagon floorboard',
-              reward: '🪙 60 Cintrian Orens & Mahakaman Clan Carbon Steel Blade',
-              vaultItemId: 'steel-mahakaman',
-              lore: 'The royal escort\'s locked payroll chest and a razor-honed dwarven steel blade hidden from looters.',
+              reward: '🪙 50 Cintrian Orens & Skellige Ursine-Forged Ring Mail Set',
+              vaultItemId: 'armor-skellige-chain',
+              lore: 'The royal escort\'s locked payroll chest and heavy cold-forged Skellige ring mail salvaged from an An Craite guard.',
             },
             {
               name: 'Burned Convoy Medical Satchel in Briars',
@@ -882,9 +882,9 @@ At the sound of your boots on the wet flagstones, the Grave Hag's head twists ne
             {
               name: 'King Elidyr\'s Burial Regalia',
               discoveryCheck: 'DC 14 Investigation inside the central sarcophagus',
-              reward: '🪙 75 Cintrian Orens & Ancient Elven Moon-Thread Silk Armor Set',
-              vaultItemId: 'armor-tir-na-lia',
-              lore: 'An otherworldly silk cuirass woven in Tir ná Lia before the First Conjunction, offering supernatural cold and necrotic resistance.',
+              reward: '🪙 75 Cintrian Orens & Gnomish Gwyhyr Razor Bastard Sword',
+              vaultItemId: 'steel-gwyhyr',
+              lore: 'A masterwork gnomish blade from Tir Tochair buried alongside King Elidyr, featuring an edge so fine it hums when drawn from its scabbard.',
             },
             {
               name: 'Marrow Hag\'s Trophy Charm',
@@ -1237,18 +1237,18 @@ Then the earth itself trembles. Crashing through the treeline comes a mountainou
           ],
           secretTreasures: [
             {
-              name: 'Primeval Heart-Tree Core & Chort Horns',
+              name: 'Primeval Heart-Tree Core & Aerondight Relic',
               discoveryCheck: 'DC 12 Witcher Senses / Survival harvesting after combat',
-              reward: '🪙 150 Cintrian Orens, Primeval Heart-Tree Amber Core, & Tor Zireael Ancient Swallow Silver Sword',
-              vaultItemId: 'silver-tor-zireael',
-              lore: 'A legendary elven silver blade entwined with ancient roots that permanently curtails monster regeneration.',
+              reward: '🪙 150 Cintrian Orens, Primeval Heart-Tree Amber Core, & Aerondight Blade of the Lady of the Lake',
+              vaultItemId: 'silver-aerondight',
+              lore: 'The consecrated blade bestowed upon champions of Witcher Virtues, alongside the pulsating amber heartwood of the Leshen.',
             },
             {
               name: 'Baron Raymond\'s Carriage Bounty Chest',
               discoveryCheck: 'Claimed by contractual mandate or extracted by force',
-              reward: '🪙 250 Cintrian Orens & Cintrian Royal Guard Lion Half-Plate Set',
-              vaultItemId: 'armor-cintrian-guard',
-              lore: 'The full royal treasury bounty and the ceremonial half-plate armor of the Marnadal knight commander.',
+              reward: '🪙 250 Cintrian Orens & Cintrian Royal Lion Signet Ring',
+              vaultItemId: 'quest-cintrian-ring',
+              lore: 'The full royal treasury bounty and Queen Calanthe\'s royal seal ring salvaged from the Baron\'s locked coach.',
             },
           ],
         },

@@ -32,7 +32,7 @@ import {
   GameItem,
 } from './types';
 import { PREGEN_WITCHERS } from './data/characters';
-import { INITIAL_ECONOMY_STATE } from './data/items';
+import { INITIAL_ECONOMY_STATE, DEFAULT_ACT_MERCHANTS } from './data/items';
 import { MAP_SCENES } from './data/maps';
 import { p2pManager, ConnectedPeerInfo } from './services/peerService';
 import { playCriticalHitSound } from './utils/audio';
@@ -554,6 +554,31 @@ export const App: React.FC = () => {
             }
             return { ...prev, [school]: updated };
           });
+        }
+        break;
+      }
+
+      case 'MERCHANT_PURCHASE': {
+        if (packet.payload) {
+          if (packet.payload.economyState) {
+            setEconomyState(packet.payload.economyState);
+          }
+          if (packet.payload.partyCharacters) {
+            setPartyCharacters(packet.payload.partyCharacters);
+          }
+          if (packet.payload.updatedCharacter && packet.payload.buyerSchool) {
+            const school = packet.payload.buyerSchool as WitcherSchool;
+            setPartyCharacters((prev) => ({
+              ...prev,
+              [school]: packet.payload.updatedCharacter,
+            }));
+            if (gameStateRef.current.selectedCharacter.school === school) {
+              setSelectedCharacter(packet.payload.updatedCharacter);
+            }
+          }
+          if (packet.payload.logText) {
+            handleAddLogMessage(packet.payload.logText, 'lore');
+          }
         }
         break;
       }
@@ -1302,6 +1327,148 @@ export const App: React.FC = () => {
     });
   };
 
+  // Purchase an item from an Act Merchant
+  const handleMerchantPurchase = (
+    buyerSchool: WitcherSchool,
+    actNum: number,
+    itemId: string
+  ) => {
+    const currentMerchants = economyState.actMerchants || DEFAULT_ACT_MERCHANTS;
+    const merchant = currentMerchants[actNum];
+    if (!merchant) return;
+
+    const mItem = merchant.items.find((i) => i.id === itemId);
+    if (!mItem || mItem.stock <= 0) {
+      handleAddLogMessage(`⚠️ Item is out of stock.`, 'system');
+      return;
+    }
+
+    const buyer = partyCharacters[buyerSchool] || PREGEN_WITCHERS.find((w) => w.school === buyerSchool);
+    if (!buyer) return;
+
+    if (buyer.gold < mItem.priceGold) {
+      handleAddLogMessage(
+        `⚠️ ${buyer.name} cannot afford ${mItem.item.name}. (Needs ${mItem.priceGold} 🪙, has ${buyer.gold} 🪙)`,
+        'system'
+      );
+      return;
+    }
+
+    // Deduct gold & clone item
+    const newGold = buyer.gold - mItem.priceGold;
+    const boughtItem: GameItem = {
+      ...mItem.item,
+      assignedToSchool: buyerSchool,
+      assignedToName: buyer.name,
+      equipped: false,
+      discoverySource: `Purchased from ${merchant.name} in Act ${actNum}`,
+    };
+
+    const newInventory = [...(buyer.inventory || []), boughtItem];
+
+    // If potion, also sync to character potions list
+    let newPotions = [...buyer.potions];
+    if (boughtItem.category === 'potion') {
+      newPotions.push({
+        name: boughtItem.name.replace(/ \(Phial #\d+\)/, ''),
+        toxicity: boughtItem.toxicity || 20,
+        charges: boughtItem.charges || 2,
+        maxCharges: boughtItem.maxCharges || 2,
+        duration: boughtItem.duration || '1 minute',
+        effect: boughtItem.effect || boughtItem.description,
+      });
+    }
+
+    // If bomb, also sync to character bombs list
+    let newBombs = [...buyer.bombs];
+    if (boughtItem.category === 'bomb') {
+      newBombs.push({
+        name: boughtItem.name.replace(/ \(Pack #\d+\)/, ''),
+        count: boughtItem.charges || 2,
+        maxCount: boughtItem.maxCharges || 2,
+        radius: '15 ft sphere',
+        effect: boughtItem.effect || boughtItem.description,
+      });
+    }
+
+    // If oil, also sync to character oils list
+    let newOils = [...buyer.oils];
+    if (boughtItem.category === 'oil') {
+      newOils.push({
+        name: boughtItem.name,
+        targetCategory: boughtItem.effect?.includes('Relict') ? 'Relicts (Leshen, Chort)' :
+                        boughtItem.effect?.includes('Specter') ? 'Specters & Hounds' :
+                        boughtItem.effect?.includes('Necrophage') ? 'Necrophages (Grave Hag)' : 'Monsters',
+        bonusDamage: '+1d8 damage',
+        charges: boughtItem.charges || 10,
+        maxCharges: boughtItem.maxCharges || 10,
+      });
+    }
+
+    const updatedBuyer: WitcherCharacter = {
+      ...buyer,
+      gold: newGold,
+      inventory: newInventory,
+      potions: newPotions,
+      bombs: newBombs,
+      oils: newOils,
+    };
+
+    // Update merchant stock
+    const updatedItems = merchant.items.map((it) =>
+      it.id === itemId ? { ...it, stock: it.stock - 1 } : it
+    );
+    const updatedMerchants = {
+      ...currentMerchants,
+      [actNum]: { ...merchant, items: updatedItems },
+    };
+
+    const newRewardRecord: RewardRecord = {
+      id: `shop-${Date.now()}`,
+      timestamp: Date.now(),
+      recipientSchool: buyerSchool,
+      recipientName: buyer.name,
+      type: 'item_grant',
+      amountGold: -mItem.priceGold,
+      itemName: boughtItem.name,
+      note: `Purchased from ${merchant.name} in Act ${actNum} for ${mItem.priceGold} Orens.`,
+    };
+
+    const newEconomy: CampaignEconomyState = {
+      ...economyState,
+      dmVaultGold: economyState.dmVaultGold + mItem.priceGold,
+      rewardLog: [...economyState.rewardLog, newRewardRecord],
+      actMerchants: updatedMerchants,
+    };
+
+    setEconomyState(newEconomy);
+
+    setPartyCharacters((prev) => ({
+      ...prev,
+      [buyerSchool]: updatedBuyer,
+    }));
+
+    if (selectedCharacter.school === buyerSchool) {
+      setSelectedCharacter(updatedBuyer);
+    }
+
+    const logText = `🪙 [Waystation Outfitter] ${merchant.name} sold ${boughtItem.name} to ${buyer.name} for ${mItem.priceGold} Cintrian Orens. (${mItem.stock - 1} remaining in stock)`;
+    handleAddLogMessage(logText, 'lore');
+
+    p2pManager.send({
+      type: 'MERCHANT_PURCHASE',
+      senderId: p2pManager.myPeerId || 'gm',
+      senderName: selectedCharacter.name || 'Party',
+      payload: {
+        buyerSchool,
+        updatedCharacter: updatedBuyer,
+        economyState: newEconomy,
+        logText,
+      },
+      timestamp: Date.now(),
+    });
+  };
+
   // Bulk Clear Tokens (monsters, npcs, or all)
   const handleClearTokens = (category: 'monsters' | 'npcs' | 'all') => {
     let remaining = tokens;
@@ -1785,6 +1952,10 @@ export const App: React.FC = () => {
               onToggleSpotlight={handleToggleSpotlight}
               onSendScriptToChat={handleSendScriptToChat}
               isHost={isHost}
+              characters={partyCharacters}
+              actMerchants={economyState.actMerchants}
+              onBuyMerchantItem={handleMerchantPurchase}
+              currentShopperSchool={selectedCharacter.school}
             />
           </div>
         )}
@@ -1860,6 +2031,10 @@ export const App: React.FC = () => {
         onToggleSpotlight={handleToggleSpotlight}
         onSendScriptToChat={handleSendScriptToChat}
         isHost={isHost}
+        characters={partyCharacters}
+        actMerchants={economyState.actMerchants}
+        onBuyMerchantItem={handleMerchantPurchase}
+        currentShopperSchool={selectedCharacter.school}
       />
 
       {/* How to Play & GM Instructions Modal */}

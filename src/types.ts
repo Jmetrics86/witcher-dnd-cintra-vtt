@@ -55,6 +55,7 @@ export type ItemCategory =
   | 'potion' 
   | 'bomb' 
   | 'oil' 
+  | 'gear'
   | 'relic' 
   | 'quest';
 
@@ -108,11 +109,32 @@ export interface RewardRecord {
   note: string;
 }
 
+export interface MerchantItem {
+  id: string;
+  item: GameItem;
+  priceGold: number;
+  stock: number;
+  maxStock: number;
+  merchantNote?: string;
+}
+
+export interface ActMerchant {
+  actNumber: number;
+  name: string;
+  title: string;
+  location: string;
+  avatarUrl?: string;
+  greeting: string;
+  lore: string;
+  items: MerchantItem[];
+}
+
 export interface CampaignEconomyState {
   totalRealmGold: number;
   dmVaultGold: number;
   vaultItems: GameItem[];
   rewardLog: RewardRecord[];
+  actMerchants?: Record<number, ActMerchant>;
 }
 
 export interface WitcherWeapon {
@@ -351,7 +373,9 @@ export interface P2PPacket {
     | 'CHARACTER_ASSIGNMENT_SYNC'
     | 'STORY_VISUAL_SYNC'
     | 'PARTY_CHOICES_SYNC'
-    | 'ECONOMY_SYNC';
+    | 'ECONOMY_SYNC'
+    | 'MERCHANT_PURCHASE'
+    | 'MERCHANT_SYNC';
   senderId: string;
   senderName: string;
   payload: any;

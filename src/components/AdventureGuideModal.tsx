@@ -20,6 +20,12 @@ import {
   Users,
   Search,
   Coins,
+  Store,
+  ShoppingBag,
+  Shield,
+  Sword,
+  FlaskConical,
+  Bomb,
 } from 'lucide-react';
 import {
   WITCHER_ADVENTURE,
@@ -28,7 +34,8 @@ import {
   CharacterBeatOpportunity,
   CauseAndEffectRipple,
 } from '../data/adventure';
-import { PartyChoiceRecord, StoryVisualOverlay, WitcherSchool } from '../types';
+import { PartyChoiceRecord, StoryVisualOverlay, WitcherSchool, WitcherCharacter, ActMerchant } from '../types';
+import { DEFAULT_ACT_MERCHANTS } from '../data/items';
 
 interface AdventureGuideModalProps {
   isOpen: boolean;
@@ -41,6 +48,10 @@ interface AdventureGuideModalProps {
   onToggleSpotlight?: (spotlightId: string) => void;
   onSendScriptToChat?: (text: string, title?: string) => void;
   isHost?: boolean;
+  characters?: WitcherCharacter[] | Record<string, WitcherCharacter>;
+  actMerchants?: Record<number, ActMerchant>;
+  onBuyMerchantItem?: (buyerSchool: WitcherSchool, actNum: number, itemId: string) => void;
+  currentShopperSchool?: WitcherSchool;
 }
 
 export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
@@ -53,6 +64,11 @@ export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
   completedSpotlights = {},
   onToggleSpotlight,
   onSendScriptToChat,
+  isHost: _isHost,
+  characters = [],
+  actMerchants,
+  onBuyMerchantItem,
+  currentShopperSchool,
 }) => {
   // Continuous scroll mode vs single act tab mode (Default: continuous scroll as requested!)
   const [viewMode, setViewMode] = useState<'continuous' | 'single'>('continuous');
@@ -61,6 +77,12 @@ export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
   const [scriptFontSize, setScriptFontSize] = useState<'normal' | 'large' | 'xl'>('large');
   // Local state for custom "Other" text inputs before/while typing
   const [customSurpriseDrafts, setCustomSurpriseDrafts] = useState<Record<string, string>>({});
+  // Selected Witcher shopper for merchant interactions
+  const [selectedShopperSchool, setSelectedShopperSchool] = useState<WitcherSchool>(
+    currentShopperSchool || 'Wolf'
+  );
+  // Temporary purchase alert message
+  const [purchaseAlert, setPurchaseAlert] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const actRefs = useRef<Record<number, HTMLDivElement | null>>({});
@@ -578,6 +600,258 @@ export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
     );
   };
 
+  // Render Act Merchant & Provisions Shop
+  const renderActMerchant = (actNum: number) => {
+    const merchant = (actMerchants && actMerchants[actNum]) || DEFAULT_ACT_MERCHANTS[actNum];
+    if (!merchant) return null;
+
+    const characterList: WitcherCharacter[] = Array.isArray(characters)
+      ? characters
+      : characters
+      ? Object.values(characters)
+      : [];
+    const currentShopper = characterList.find((c) => c.school === selectedShopperSchool) || characterList[0];
+    const shopperGold = currentShopper ? currentShopper.gold : 0;
+
+    return (
+      <div className="rounded-2xl border border-[#c99a45]/35 bg-[#121417] p-5 shadow-2xl space-y-4">
+        {/* Merchant Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#282d33] pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-amber-950/40 border border-[#c99a45]/40 flex items-center justify-center shrink-0">
+              <Store className="w-6 h-6 text-[#c99a45]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-cinzel font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-600/40">
+                  Act {actNum} Waystation Merchant
+                </span>
+                <span className="text-[10px] text-[#8a929a] font-mono">
+                  📍 {merchant.location}
+                </span>
+              </div>
+              <h4 className="font-cinzel text-lg font-bold text-white mt-0.5">
+                {merchant.name}
+              </h4>
+              <p className="text-xs text-[#9aa3ab] font-cormorant italic">
+                {merchant.title}
+              </p>
+            </div>
+          </div>
+
+          {/* Witcher Shopper Selection Buttons */}
+          <div className="bg-[#181b1f] p-2 rounded-xl border border-[#2b3138]">
+            <div className="text-[10px] font-cinzel text-[#8a929a] uppercase tracking-wider mb-1.5 flex items-center justify-between gap-2">
+              <span>Customer Purse:</span>
+              <span className="font-mono text-[#c99a45] font-bold">
+                🪙 {currentShopper?.name || 'Witcher'}: {shopperGold} Orens
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {(['Wolf', 'Cat', 'Griffin', 'Bear'] as WitcherSchool[]).map((school) => {
+                const char = characterList.find((c) => c.school === school);
+                const isSelected = selectedShopperSchool === school;
+                return (
+                  <button
+                    key={school}
+                    type="button"
+                    onClick={() => setSelectedShopperSchool(school)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-cinzel flex items-center gap-1.5 transition-all ${
+                      isSelected
+                        ? 'bg-[#c99a45] text-black font-bold shadow-md shadow-[#c99a45]/20'
+                        : 'bg-[#121416] text-[#a4b0ba] hover:text-white hover:bg-[#20252b] border border-[#272d34]'
+                    }`}
+                  >
+                    <span>{school === 'Wolf' ? '🐺' : school === 'Cat' ? '🐱' : school === 'Griffin' ? '🦅' : '🐻'}</span>
+                    <span>{school}</span>
+                    <span className="font-mono text-[10px] opacity-80">
+                      ({char ? char.gold : 15}🪙)
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Merchant Greeting & Dialogue */}
+        <div className="p-3.5 rounded-xl bg-[#171a1d] border border-[#262c33] flex items-start gap-3">
+          <MessageSquarePlus className="w-4 h-4 text-[#c99a45] shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="text-xs sm:text-sm text-[#d4dde5] font-cormorant italic leading-relaxed">
+              "{merchant.greeting}"
+            </p>
+            <p className="text-[11px] text-[#808a95] font-cormorant">
+              {merchant.lore}
+            </p>
+          </div>
+        </div>
+
+        {/* Purchase Alert Feedback */}
+        {purchaseAlert && (
+          <div
+            className={`p-2.5 rounded-xl text-xs font-cinzel flex items-center gap-2 border ${
+              purchaseAlert.type === 'success'
+                ? 'bg-emerald-950/60 border-emerald-600/50 text-emerald-300'
+                : 'bg-rose-950/60 border-rose-600/50 text-rose-300'
+            }`}
+          >
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span>{purchaseAlert.message}</span>
+          </div>
+        )}
+
+        {/* Finite Wares Catalog Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {merchant.items.map((mItem) => {
+            const it = mItem.item;
+            const inStock = mItem.stock > 0;
+            const canAfford = shopperGold >= mItem.priceGold;
+            const isArmor = it.category === 'armor';
+            const isSteel = it.category === 'steel_sword';
+            const isSilver = it.category === 'silver_sword';
+            const isPotion = it.category === 'potion';
+            const isBomb = it.category === 'bomb';
+
+            return (
+              <div
+                key={mItem.id}
+                className={`p-3.5 rounded-xl border flex flex-col justify-between gap-3 transition-all ${
+                  inStock
+                    ? 'bg-[#14171a] border-[#293038] hover:border-[#3d4854]'
+                    : 'bg-[#101214] border-[#1e2329] opacity-60'
+                }`}
+              >
+                <div>
+                  {/* Item Header */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-cinzel text-xs font-bold text-white">
+                          {it.name}
+                        </span>
+                        <span
+                          className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${
+                            it.rarity === 'Relic'
+                              ? 'bg-purple-950 text-purple-300 border border-purple-500/40'
+                              : it.rarity === 'Masterwork'
+                              ? 'bg-amber-950 text-amber-300 border border-amber-500/40'
+                              : 'bg-zinc-800 text-zinc-300'
+                          }`}
+                        >
+                          {it.rarity}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-[#c99a45] font-mono mt-0.5">
+                        🪙 {mItem.priceGold} Cintrian Orens
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      {isArmor && <Shield className="w-3.5 h-3.5 text-sky-400" />}
+                      {isSteel && <Sword className="w-3.5 h-3.5 text-zinc-300" />}
+                      {isSilver && <Sword className="w-3.5 h-3.5 text-amber-400" />}
+                      {isPotion && <FlaskConical className="w-3.5 h-3.5 text-emerald-400" />}
+                      {isBomb && <Bomb className="w-3.5 h-3.5 text-amber-500" />}
+                      <span className="text-[9px] font-cinzel px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
+                        {it.category.replace('_', ' ')}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Flavor Note / Description */}
+                  <p className="text-[11px] text-[#8a929a] font-cormorant italic mt-1.5 leading-snug">
+                    {mItem.merchantNote || it.description}
+                  </p>
+
+                  {/* Item Stats pills */}
+                  <div className="mt-2 space-y-1">
+                    {it.armorClass && (
+                      <div className="text-[11px] text-sky-400 font-mono flex items-center gap-1">
+                        <span>🛡️ AC {it.armorClass}</span>
+                        <span className="text-[#6c7682]">({it.weightCategory || 'Medium'})</span>
+                      </div>
+                    )}
+                    {it.damage && (
+                      <div className="text-[11px] text-rose-400 font-mono">
+                        ⚔️ {it.damage}
+                      </div>
+                    )}
+                    {it.properties && it.properties.length > 0 && (
+                      <div className="text-[10px] text-[#939da8] font-mono flex flex-wrap gap-1">
+                        {it.properties.map((p, i) => (
+                          <span key={i} className="px-1 py-0.2 rounded bg-zinc-800/80 border border-zinc-700/60">
+                            {p}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {it.effect && (
+                      <div className="text-[10px] text-emerald-400 font-mono">
+                        ✨ {it.effect}
+                      </div>
+                    )}
+                    {it.toxicity !== undefined && it.toxicity > 0 && (
+                      <div className="text-[10px] text-lime-400 font-mono">
+                        🧪 +{it.toxicity}% Toxicity • Duration: {it.duration || '1 minute'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer: Stock & Buy Action */}
+                <div className="pt-2 border-t border-[#22272e] flex items-center justify-between gap-2">
+                  <div>
+                    {inStock ? (
+                      <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>{mItem.stock} in Stock</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-mono text-rose-400 font-bold">
+                        SOLD OUT
+                      </span>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={!inStock || !canAfford}
+                    onClick={() => {
+                      if (!inStock || !canAfford) return;
+                      onBuyMerchantItem?.(selectedShopperSchool, actNum, mItem.id);
+                      setPurchaseAlert({
+                        message: `Purchased ${it.name} for ${currentShopper?.name || selectedShopperSchool}! (Purse: ${shopperGold - mItem.priceGold} 🪙)`,
+                        type: 'success',
+                      });
+                      setTimeout(() => setPurchaseAlert(null), 4000);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-cinzel font-bold transition-all flex items-center gap-1.5 ${
+                      !inStock
+                        ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700'
+                        : !canAfford
+                        ? 'bg-rose-950/40 text-rose-400 border border-rose-800/50 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-[#c99a45] to-[#a67d30] text-black hover:brightness-110 shadow-md shadow-[#c99a45]/20'
+                    }`}
+                  >
+                    <ShoppingBag className="w-3.5 h-3.5" />
+                    <span>
+                      {!inStock
+                        ? 'Sold Out'
+                        : !canAfford
+                        ? `Need ${mItem.priceGold - shopperGold} 🪙`
+                        : `Buy (${mItem.priceGold} 🪙)`}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   // Render a Complete Act Section
   const renderActSection = (act: AdventureAct) => {
     return (
@@ -836,6 +1110,9 @@ export const AdventureGuideModal: React.FC<AdventureGuideModalProps> = ({
             ))}
           </div>
         </div>
+
+        {/* Act Merchant & Provisions Shop */}
+        {renderActMerchant(act.act)}
 
         {/* Character-Specific Opportunities for this Act */}
         {renderCharacterOpportunities(act.characterOpportunities)}
