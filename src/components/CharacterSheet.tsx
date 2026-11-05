@@ -11,7 +11,12 @@ import {
   Activity, 
   RotateCcw,
   Sparkles,
-  Info
+  BookOpen,
+  MessageSquare,
+  Users,
+  Compass,
+  Award,
+  Feather
 } from 'lucide-react';
 import { WitcherCharacter, WitcherSignName } from '../types';
 import { WITCHER_SIGNS } from '../data/signs';
@@ -314,12 +319,12 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex border-b border-[#282d33] bg-[#141618] px-4">
+      <div className="flex flex-wrap border-b border-[#282d33] bg-[#141618] px-4">
         {[
           { id: 'combat', label: 'Combat & Signs', icon: Sword },
           { id: 'alchemy', label: 'Alchemy & Bombs', icon: FlaskConical },
           { id: 'skills', label: 'Ability Scores & Senses', icon: Activity },
-          { id: 'lore', label: 'Lore & Code', icon: Info },
+          { id: 'lore', label: 'Roleplay Guide & Backstory', icon: BookOpen },
         ].map((tab) => {
           const Icon = tab.icon;
           return (
@@ -334,6 +339,11 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
             >
               <Icon className="w-3.5 h-3.5" />
               <span>{tab.label}</span>
+              {tab.id === 'lore' && activeSheetTab !== 'lore' && (
+                <span className="ml-1 px-1.5 py-0.2 rounded bg-[#c99a45]/20 text-[#e2ba6d] border border-[#c99a45]/40 text-[9px] uppercase">
+                  Guide
+                </span>
+              )}
             </button>
           );
         })}
@@ -503,17 +513,32 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
               </div>
             </div>
 
-            {/* School Special Perk Banner */}
-            <div className="p-4 rounded-xl border border-[#c99a45]/40 bg-[#191814] flex items-start gap-3">
-              <Zap className="w-5 h-5 text-[#c99a45] shrink-0 mt-0.5" />
-              <div>
-                <div className="font-cinzel text-sm font-bold text-[#e2ba6d]">
-                  School of the {character.school} Mastery: {character.schoolPerk.name}
+            {/* School Special Perk & Differentiation Banner */}
+            <div className="p-4 rounded-xl border border-[#c99a45]/40 bg-[#191814] flex flex-col sm:flex-row items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <Zap className="w-5 h-5 text-[#c99a45] shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-cinzel text-sm font-bold text-[#e2ba6d]">
+                    School of the {character.school} Mastery: {character.schoolPerk.name}
+                  </div>
+                  <p className="text-xs text-[#b8b3a8] mt-1 leading-relaxed">
+                    {character.schoolPerk.description}
+                  </p>
+                  {character.roleplayGuide && (
+                    <p className="text-xs text-[#c99a45]/90 font-cormorant italic mt-2 border-t border-[#c99a45]/20 pt-2">
+                      <strong className="font-cinzel not-italic text-[11px] uppercase tracking-wider">What Sets You Apart: </strong>
+                      {character.roleplayGuide.whatMakesYouDifferent}
+                    </p>
+                  )}
                 </div>
-                <p className="text-xs text-[#b8b3a8] mt-1 leading-relaxed">
-                  {character.schoolPerk.description}
-                </p>
               </div>
+              <button
+                onClick={() => setActiveSheetTab('lore')}
+                className="px-3 py-2 bg-[#c99a45]/20 hover:bg-[#c99a45]/30 border border-[#c99a45]/50 text-[#e2ba6d] font-cinzel font-bold text-xs rounded-lg shrink-0 flex items-center gap-1.5 transition-colors"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>Full Roleplay Guide & Backstory</span>
+              </button>
             </div>
 
           </div>
@@ -684,30 +709,208 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
           </div>
         )}
 
-        {/* TAB 4: LORE & CODE */}
+        {/* TAB 4: ROLEPLAY GUIDE & BACKSTORY */}
         {activeSheetTab === 'lore' && (
-          <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-[#121416] border border-[#262b31]">
-              <h4 className="font-cinzel text-sm font-bold text-[#e2ba6d] mb-1">
-                Backstory: {character.name}
-              </h4>
-              <p className="text-xs text-[#a6b1b9] leading-relaxed">
-                {character.backstory}
-              </p>
+          <div className="space-y-6">
+            
+            {/* Section 1: What Makes Your Witcher Different & Combat Philosophy */}
+            {character.roleplayGuide && (
+              <div className="p-5 rounded-xl bg-gradient-to-br from-[#191713] to-[#131518] border border-[#c99a45]/40 space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-2 border-b border-[#c99a45]/20 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Award className="w-5 h-5 text-[#c99a45]" />
+                    <h3 className="font-cinzel text-base font-bold text-[#e2ba6d]">
+                      What Makes {character.name} Different (School of the {character.school})
+                    </h3>
+                  </div>
+                  <span className="text-[11px] font-cinzel px-2.5 py-0.5 rounded bg-[#c99a45]/20 text-[#e2ba6d] border border-[#c99a45]/30">
+                    {character.schoolPerk.name}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-3.5 rounded-lg bg-black/30 border border-white/5">
+                    <div className="text-xs font-cinzel font-bold text-[#c99a45] uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                      <Compass className="w-3.5 h-3.5" />
+                      School Identity & Differentiation
+                    </div>
+                    <p className="text-sm text-[#e6e1d6] leading-relaxed font-cormorant">
+                      {character.roleplayGuide.whatMakesYouDifferent}
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-lg bg-black/30 border border-white/5">
+                    <div className="text-xs font-cinzel font-bold text-sky-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                      <Sword className="w-3.5 h-3.5" />
+                      Combat Philosophy & Tactical Role
+                    </div>
+                    <p className="text-sm text-[#d6d9dc] leading-relaxed font-cormorant">
+                      {character.roleplayGuide.combatPhilosophy}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Section 2: Roleplaying Guide (Voice, Mannerisms & Table Tips) */}
+            {character.roleplayGuide && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {/* Voice & Mannerisms */}
+                <div className="p-4 rounded-xl bg-[#121416] border border-[#262b31] flex flex-col justify-between space-y-3">
+                  <div>
+                    <h4 className="font-cinzel text-sm font-bold text-amber-300 mb-2 flex items-center gap-2">
+                      <Feather className="w-4 h-4 text-amber-400" />
+                      <span>Voice, Demeanor & Table Mannerisms</span>
+                    </h4>
+                    <p className="text-sm text-[#d6d9dc] leading-relaxed font-cormorant">
+                      {character.roleplayGuide.voiceAndMannerisms}
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-[#181b1f] border border-[#2c333a]">
+                    <div className="text-[11px] font-cinzel font-bold text-rose-300 uppercase tracking-wider mb-1">
+                      Personal Stake in the Marnadal Contract
+                    </div>
+                    <p className="text-xs text-[#b8c0c8] leading-relaxed">
+                      {character.roleplayGuide.personalStakeInContract}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Roleplay Prompts & Table Tips */}
+                <div className="p-4 rounded-xl bg-[#121416] border border-[#262b31]">
+                  <h4 className="font-cinzel text-sm font-bold text-emerald-300 mb-2.5 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-emerald-400" />
+                    <span>How to Roleplay {character.name.split(' ')[0]} at the Table</span>
+                  </h4>
+                  <ul className="space-y-2">
+                    {character.roleplayGuide.roleplayTips.map((tip, idx) => (
+                      <li
+                        key={idx}
+                        className="text-xs sm:text-sm text-[#cfd5db] leading-relaxed flex items-start gap-2 bg-[#16191d] p-2.5 rounded-lg border border-[#23282e]"
+                      >
+                        <span className="text-emerald-400 font-bold mt-0.5">•</span>
+                        <span>{tip}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+              </div>
+            )}
+
+            {/* Section 3: Signature In-Character Quotes (Click to Speak in Chat) */}
+            {character.roleplayGuide && character.roleplayGuide.signatureQuotes.length > 0 && (
+              <div className="p-4 rounded-xl bg-[#121416] border border-[#262b31]">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-cinzel text-sm font-bold text-white flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-[#c99a45]" />
+                    <span>Signature In-Character Lines (Click to Speak in Party Log)</span>
+                  </h4>
+                  <span className="text-[11px] text-[#8a929a]">Broadcasts directly to party chat</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {character.roleplayGuide.signatureQuotes.map((quote, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => onAddLogMessage(quote, 'chat')}
+                      className="p-3.5 rounded-xl bg-[#171a1e] hover:bg-[#1e2329] border border-[#2c333b] hover:border-[#c99a45] text-left transition-all flex flex-col justify-between group"
+                    >
+                      <p className="text-sm text-[#e6e1d6] font-cormorant italic leading-relaxed">
+                        {quote}
+                      </p>
+                      <div className="mt-2.5 pt-2 border-t border-white/5 flex items-center justify-between text-[10px] font-cinzel text-[#c99a45] group-hover:text-[#e2ba6d]">
+                        <span>Speak Line in Chat</span>
+                        <MessageSquare className="w-3 h-3" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Section 4: Deep Backstory & School Secrets */}
+            <div className="p-5 rounded-xl bg-[#121416] border border-[#262b31] space-y-4">
+              <div>
+                <h4 className="font-cinzel text-base font-bold text-[#e2ba6d] mb-2 flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-[#c99a45]" />
+                  <span>Full Backstory: {character.name}</span>
+                </h4>
+                <div className="space-y-3 text-base text-[#d6d9dc] font-cormorant leading-relaxed">
+                  {character.backstory.split('\n\n').map((para, idx) => (
+                    <p key={idx} className="leading-relaxed">
+                      {para}
+                    </p>
+                  ))}
+                </div>
+              </div>
+
+              {character.roleplayGuide?.schoolHistoryAndSecrets && (
+                <div className="p-4 rounded-lg bg-[#17191c] border border-[#c99a45]/30">
+                  <div className="font-cinzel text-xs font-bold text-[#c99a45] uppercase tracking-wider mb-1">
+                    Secrets of the School of the {character.school}
+                  </div>
+                  <p className="text-sm text-[#b8c0c8] leading-relaxed font-cormorant">
+                    {character.roleplayGuide.schoolHistoryAndSecrets}
+                  </p>
+                </div>
+              )}
             </div>
 
+            {/* Section 5: Party Bonds & Friction with the Other 3 Witchers */}
+            {character.roleplayGuide && character.roleplayGuide.partyBonds.length > 0 && (
+              <div className="p-4 rounded-xl bg-[#121416] border border-[#262b31]">
+                <h4 className="font-cinzel text-sm font-bold text-white mb-3 flex items-center gap-2">
+                  <Users className="w-4 h-4 text-[#c99a45]" />
+                  <span>Fellow Witchers on the Path: Bonds, Rivalry & Dynamics</span>
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {character.roleplayGuide.partyBonds.map((pb) => (
+                    <div
+                      key={pb.school}
+                      className="p-3.5 rounded-xl bg-[#16191d] border border-[#2a3038] flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <span className="font-cinzel text-xs font-bold text-white">
+                            {pb.witcherName}
+                          </span>
+                          <span className="text-[10px] font-cinzel px-2 py-0.5 rounded bg-[#c99a45]/15 text-[#e2ba6d] border border-[#c99a45]/30">
+                            {pb.school}
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#b8c0c8] leading-relaxed">
+                          {pb.dynamic}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Section 6: Core Character Pillars (Ideal, Flaw, Bond) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="p-3 bg-[#121416] border border-[#262b31] rounded-lg">
-                <div className="font-cinzel text-xs font-bold text-white mb-1">Ideal</div>
-                <p className="text-xs text-[#8a929a]">{character.ideal}</p>
+              <div className="p-3.5 bg-[#121416] border border-[#262b31] rounded-xl">
+                <div className="font-cinzel text-xs font-bold text-[#e2ba6d] uppercase tracking-wider mb-1">
+                  Witcher Ideal
+                </div>
+                <p className="text-xs sm:text-sm text-[#c8cfd6] leading-relaxed">{character.ideal}</p>
               </div>
-              <div className="p-3 bg-[#121416] border border-[#262b31] rounded-lg">
-                <div className="font-cinzel text-xs font-bold text-white mb-1">Flaw</div>
-                <p className="text-xs text-[#8a929a]">{character.flaw}</p>
+              <div className="p-3.5 bg-[#121416] border border-[#262b31] rounded-xl">
+                <div className="font-cinzel text-xs font-bold text-rose-400 uppercase tracking-wider mb-1">
+                  Fatal Flaw
+                </div>
+                <p className="text-xs sm:text-sm text-[#c8cfd6] leading-relaxed">{character.flaw}</p>
               </div>
-              <div className="p-3 bg-[#121416] border border-[#262b31] rounded-lg">
-                <div className="font-cinzel text-xs font-bold text-white mb-1">Bond</div>
-                <p className="text-xs text-[#8a929a]">{character.bond}</p>
+              <div className="p-3.5 bg-[#121416] border border-[#262b31] rounded-xl">
+                <div className="font-cinzel text-xs font-bold text-sky-400 uppercase tracking-wider mb-1">
+                  Sworn Bond
+                </div>
+                <p className="text-xs sm:text-sm text-[#c8cfd6] leading-relaxed">{character.bond}</p>
               </div>
             </div>
           </div>

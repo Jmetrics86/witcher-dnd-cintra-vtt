@@ -98,6 +98,39 @@ export interface WitcherCharacter {
   ideal: string;
   bond: string;
   avatarUrl: string;
+  roleplayGuide?: WitcherRoleplayGuide;
+}
+
+export interface WitcherRoleplayGuide {
+  whatMakesYouDifferent: string;
+  voiceAndMannerisms: string;
+  combatPhilosophy: string;
+  roleplayTips: string[];
+  signatureQuotes: string[];
+  schoolHistoryAndSecrets: string;
+  partyBonds: {
+    school: WitcherSchool;
+    witcherName: string;
+    dynamic: string;
+  }[];
+  personalStakeInContract: string;
+}
+
+export interface StoryVisualOverlay {
+  id: string;
+  actNumber: number;
+  title: string;
+  subtitle: string;
+  caption: string;
+  imageUrl: string;
+}
+
+export interface PartyChoiceRecord {
+  choicePointId: string;
+  actNumber: number;
+  selectedOptionId: string;
+  customSurpriseText?: string;
+  updatedAt: number;
 }
 
 export interface MonsterAttack {
@@ -215,7 +248,9 @@ export interface P2PPacket {
     | 'CHARACTER_UPDATE'
     | 'PING_COORDINATE'
     | 'CHARACTER_CLAIM'
-    | 'CHARACTER_ASSIGNMENT_SYNC';
+    | 'CHARACTER_ASSIGNMENT_SYNC'
+    | 'STORY_VISUAL_SYNC'
+    | 'PARTY_CHOICES_SYNC';
   senderId: string;
   senderName: string;
   payload: any;

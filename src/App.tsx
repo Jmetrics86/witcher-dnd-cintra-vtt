@@ -23,6 +23,8 @@ import {
   Monster,
   SpeechRoleplayMode,
   CharacterAssignment,
+  StoryVisualOverlay,
+  PartyChoiceRecord,
 } from './types';
 import { PREGEN_WITCHERS } from './data/characters';
 import { MAP_SCENES } from './data/maps';
@@ -189,6 +191,21 @@ export const App: React.FC = () => {
     };
   });
 
+  // Active Story Visualization Overlay (Replaces battle map when shown to players)
+  const [activeStoryVisual, setActiveStoryVisual] = useState<StoryVisualOverlay | null>(() => {
+    return initialSave?.activeStoryVisual || null;
+  });
+
+  // Party Cause & Effect Choices across Acts I-IV + Epilogue
+  const [partyChoices, setPartyChoices] = useState<Record<string, PartyChoiceRecord>>(() => {
+    return initialSave?.partyChoices || {};
+  });
+
+  // Completed Character-Specific Spotlights
+  const [completedSpotlights, setCompletedSpotlights] = useState<Record<string, boolean>>(() => {
+    return initialSave?.completedSpotlights || {};
+  });
+
   // Ref to hold live state for asynchronous P2P packet handling
   const gameStateRef = useRef({
     currentScene,
@@ -196,6 +213,9 @@ export const App: React.FC = () => {
     messages,
     selectedCharacter,
     characterAssignments,
+    activeStoryVisual,
+    partyChoices,
+    completedSpotlights,
     isHost,
   });
   useEffect(() => {
@@ -205,9 +225,12 @@ export const App: React.FC = () => {
       messages,
       selectedCharacter,
       characterAssignments,
+      activeStoryVisual,
+      partyChoices,
+      completedSpotlights,
       isHost,
     };
-  }, [currentScene, tokens, messages, selectedCharacter, characterAssignments, isHost]);
+  }, [currentScene, tokens, messages, selectedCharacter, characterAssignments, activeStoryVisual, partyChoices, completedSpotlights, isHost]);
 
   // Auto-save to Game Master's browser local storage
   useEffect(() => {
@@ -217,8 +240,11 @@ export const App: React.FC = () => {
       messages,
       selectedCharacterId: selectedCharacter.id,
       characterAssignments,
+      activeStoryVisual,
+      partyChoices,
+      completedSpotlights,
     });
-  }, [currentScene, tokens, messages, selectedCharacter, characterAssignments]);
+  }, [currentScene, tokens, messages, selectedCharacter, characterAssignments, activeStoryVisual, partyChoices, completedSpotlights]);
 
   // Handle incoming P2P Packet
   const handleP2PPacket = useCallback((packet: P2PPacket) => {
@@ -283,6 +309,8 @@ export const App: React.FC = () => {
               messages: gameStateRef.current.messages,
               selectedCharacterId: gameStateRef.current.selectedCharacter.id,
               characterAssignments: gameStateRef.current.characterAssignments,
+              activeStoryVisual: gameStateRef.current.activeStoryVisual,
+              partyChoices: gameStateRef.current.partyChoices,
               gmPlaysWitcher: p2pManager.hostPlaysWitcher,
               connectedPeers: p2pManager.getConnectedPeers(),
             },
@@ -301,6 +329,12 @@ export const App: React.FC = () => {
         }
         if (packet.payload.messages && Array.isArray(packet.payload.messages)) {
           setMessages(packet.payload.messages);
+        }
+        if (packet.payload.activeStoryVisual !== undefined) {
+          setActiveStoryVisual(packet.payload.activeStoryVisual);
+        }
+        if (packet.payload.partyChoices) {
+          setPartyChoices(packet.payload.partyChoices);
         }
         if (packet.payload.gmPlaysWitcher !== undefined) {
           setGmPlaysWitcher(packet.payload.gmPlaysWitcher);
@@ -435,6 +469,16 @@ export const App: React.FC = () => {
         if (packet.payload.currentSceneId) {
           const s = MAP_SCENES.find((sc) => sc.id === packet.payload.currentSceneId);
           if (s) setCurrentScene(s);
+        }
+        break;
+
+      case 'STORY_VISUAL_SYNC':
+        setActiveStoryVisual(packet.payload || null);
+        break;
+
+      case 'PARTY_CHOICES_SYNC':
+        if (packet.payload) {
+          setPartyChoices(packet.payload);
         }
         break;
     }
@@ -803,6 +847,91 @@ export const App: React.FC = () => {
     handleAddLogMessage(`Scene transitioned to Act ${scene.actNumber}: ${scene.name}`, 'system');
   };
 
+  // Show or Clear Story Visualization Image (Replaces Battle Map on all screens)
+  const handleShowStoryVisual = (visual: StoryVisualOverlay | null) => {
+    setActiveStoryVisual(visual);
+
+    p2pManager.send({
+      type: 'STORY_VISUAL_SYNC',
+      senderId: 'gm',
+      senderName: 'Game Master',
+      payload: visual,
+      timestamp: Date.now(),
+    });
+
+    if (visual) {
+      const msg: ChatMessage = {
+        id: `visual-${Date.now()}`,
+        senderId: 'gm',
+        senderName: 'Game Master',
+        isDM: true,
+        type: 'lore',
+        text: `🖼️ [Story Visualization: ${visual.title}] "${visual.caption}"`,
+        timestamp: Date.now(),
+      };
+      setMessages((prev) => [...prev, msg]);
+      p2pManager.send({
+        type: 'CHAT_MESSAGE',
+        senderId: 'gm',
+        senderName: 'Game Master',
+        payload: msg,
+        timestamp: Date.now(),
+      });
+    } else {
+      handleAddLogMessage('Returned view from Story Visualization to Tactical Battle Map.', 'system');
+    }
+  };
+
+  // Update Interactive Party Choice (Cause & Effect Engine across Acts)
+  const handleUpdatePartyChoice = (record: PartyChoiceRecord) => {
+    const updated = {
+      ...partyChoices,
+      [record.choicePointId]: record,
+    };
+    setPartyChoices(updated);
+
+    p2pManager.send({
+      type: 'PARTY_CHOICES_SYNC',
+      senderId: 'gm',
+      senderName: 'Game Master',
+      payload: updated,
+      timestamp: Date.now(),
+    });
+  };
+
+  // Toggle Character-Specific Spotlight Completion
+  const handleToggleSpotlight = (spotlightId: string) => {
+    setCompletedSpotlights((prev) => ({
+      ...prev,
+      [spotlightId]: !prev[spotlightId],
+    }));
+  };
+
+  // Send Read-Aloud Script or Spotlight Prompt from Module directly to Party Chat Log
+  const handleSendScriptToChat = (text: string, title?: string) => {
+    const formatted = title ? `[${title}] ${text}` : text;
+    const msg: ChatMessage = {
+      id: `script-${Date.now()}`,
+      senderId: 'gm',
+      senderName: 'Game Master',
+      isDM: true,
+      type: 'lore',
+      text: formatted,
+      speechMode: 'dm',
+      timestamp: Date.now(),
+    };
+
+    setMessages((prev) => [...prev, msg]);
+
+    p2pManager.send({
+      type: 'CHAT_MESSAGE',
+      senderId: 'gm',
+      senderName: 'Game Master',
+      payload: msg,
+      timestamp: Date.now(),
+    });
+  };
+
   // Ping Map
   const handlePing = (x: number, y: number) => {
     setPingLocation({ x, y });
@@ -951,6 +1080,15 @@ export const App: React.FC = () => {
     if (saved.characterAssignments) {
       setCharacterAssignments(saved.characterAssignments);
     }
+    if (saved.partyChoices) {
+      setPartyChoices(saved.partyChoices);
+    }
+    if (saved.completedSpotlights) {
+      setCompletedSpotlights(saved.completedSpotlights);
+    }
+    if (saved.activeStoryVisual !== undefined) {
+      setActiveStoryVisual(saved.activeStoryVisual);
+    }
 
     if (isHost) {
       p2pManager.send({
@@ -963,6 +1101,8 @@ export const App: React.FC = () => {
           messages: saved.messages,
           selectedCharacterId: saved.selectedCharacterId,
           characterAssignments: saved.characterAssignments || characterAssignments,
+          partyChoices: saved.partyChoices || partyChoices,
+          activeStoryVisual: saved.activeStoryVisual ?? activeStoryVisual,
         },
         timestamp: Date.now(),
       });
@@ -982,6 +1122,8 @@ export const App: React.FC = () => {
         messages,
         selectedCharacterId: selectedCharacter.id,
         characterAssignments,
+        partyChoices,
+        activeStoryVisual,
       },
       timestamp: Date.now(),
     });
@@ -994,6 +1136,9 @@ export const App: React.FC = () => {
     setCurrentScene(MAP_SCENES[0]);
     setSelectedCharacter(PREGEN_WITCHERS[0]);
     setTokens(getDefaultTokens());
+    setActiveStoryVisual(null);
+    setPartyChoices({});
+    setCompletedSpotlights({});
     setMessages([
       {
         id: 'msg-init-1',
@@ -1084,6 +1229,8 @@ export const App: React.FC = () => {
                 pingLocation={pingLocation}
                 isHost={isHost}
                 selectedCharacter={selectedCharacter}
+                activeStoryVisual={activeStoryVisual}
+                onShowStoryVisual={handleShowStoryVisual}
               />
             </div>
 
@@ -1131,6 +1278,14 @@ export const App: React.FC = () => {
             <AdventureGuideModal
               isOpen={true}
               onClose={() => setActiveTab('map')}
+              activeStoryVisual={activeStoryVisual}
+              onShowStoryVisual={handleShowStoryVisual}
+              partyChoices={partyChoices}
+              onUpdatePartyChoice={handleUpdatePartyChoice}
+              completedSpotlights={completedSpotlights}
+              onToggleSpotlight={handleToggleSpotlight}
+              onSendScriptToChat={handleSendScriptToChat}
+              isHost={isHost}
             />
           </div>
         )}
@@ -1198,6 +1353,14 @@ export const App: React.FC = () => {
       <AdventureGuideModal
         isOpen={isGuideModalOpen}
         onClose={() => setIsGuideModalOpen(false)}
+        activeStoryVisual={activeStoryVisual}
+        onShowStoryVisual={handleShowStoryVisual}
+        partyChoices={partyChoices}
+        onUpdatePartyChoice={handleUpdatePartyChoice}
+        completedSpotlights={completedSpotlights}
+        onToggleSpotlight={handleToggleSpotlight}
+        onSendScriptToChat={handleSendScriptToChat}
+        isHost={isHost}
       />
 
       {/* How to Play & GM Instructions Modal */}

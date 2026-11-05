@@ -28,6 +28,8 @@ const HOST_ONLY_PACKET_TYPES = new Set<P2PPacket['type']>([
   'TOKEN_ADD',
   'TOKEN_REMOVE',
   'CHARACTER_ASSIGNMENT_SYNC',
+  'STORY_VISUAL_SYNC',
+  'PARTY_CHOICES_SYNC',
 ]);
 
 const VALID_PACKET_TYPES = new Set<P2PPacket['type']>([
@@ -44,6 +46,8 @@ const VALID_PACKET_TYPES = new Set<P2PPacket['type']>([
   'PING_COORDINATE',
   'CHARACTER_CLAIM',
   'CHARACTER_ASSIGNMENT_SYNC',
+  'STORY_VISUAL_SYNC',
+  'PARTY_CHOICES_SYNC',
 ]);
 
 // Convert ArrayBuffer / Uint8Array to Base64

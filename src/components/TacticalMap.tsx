@@ -3,11 +3,15 @@ import {
   Grid, 
   MapPin, 
   Trash2, 
-  Compass
+  Compass,
+  Image as ImageIcon,
+  Map as MapIcon,
+  EyeOff
 } from 'lucide-react';
-import { MapScene, MapToken, WitcherCharacter } from '../types';
+import { MapScene, MapToken, WitcherCharacter, StoryVisualOverlay } from '../types';
 import { MAP_SCENES } from '../data/maps';
 import { MONSTERS } from '../data/monsters';
+import { WITCHER_ADVENTURE } from '../data/adventure';
 
 interface TacticalMapProps {
   currentScene: MapScene;
@@ -17,9 +21,11 @@ interface TacticalMapProps {
   onTokenAdd?: (token: MapToken) => void;
   onTokenRemove?: (tokenId: string) => void;
   onPing: (x: number, y: number) => void;
-  pingLocation: { x: number; y: number } | null;
+  pingLocation: { x: number, y: number } | null;
   isHost: boolean;
   selectedCharacter: WitcherCharacter | null;
+  activeStoryVisual?: StoryVisualOverlay | null;
+  onShowStoryVisual?: (visual: StoryVisualOverlay | null) => void;
 }
 
 export const TacticalMap: React.FC<TacticalMapProps> = ({
@@ -33,11 +39,18 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
   pingLocation,
   isHost,
   selectedCharacter,
+  activeStoryVisual = null,
+  onShowStoryVisual,
 }) => {
   const [showGrid, setShowGrid] = useState(true);
   const [activeTool, setActiveTool] = useState<'move' | 'ping'>('move');
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
   const mapRef = useRef<HTMLDivElement>(null);
+
+  // Find corresponding Act Story Visual for quick toggle
+  const currentActStoryVisual = WITCHER_ADVENTURE.acts.find(
+    (act) => act.act === currentScene.actNumber
+  )?.storyVisuals?.[0];
 
   // Handle map click
   const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -102,8 +115,31 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
         </div>
 
         {/* Tactical Controls & Tools */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           
+          {/* Story Visualization Mode Toggle (Shows Story Art Instead of Battle Map) */}
+          {onShowStoryVisual && (
+            activeStoryVisual ? (
+              <button
+                onClick={() => onShowStoryVisual(null)}
+                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-black font-cinzel font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-600/20 transition-all"
+                title="Hide Story Visualization and return to the gridded Tactical Battle Map"
+              >
+                <MapIcon className="w-3.5 h-3.5" />
+                <span>Return to Battle Map</span>
+              </button>
+            ) : currentActStoryVisual ? (
+              <button
+                onClick={() => onShowStoryVisual(currentActStoryVisual)}
+                className="px-2.5 py-1 rounded-lg bg-[#c99a45]/20 hover:bg-[#c99a45]/30 border border-[#c99a45]/50 text-[#e2ba6d] font-cinzel font-bold text-xs flex items-center gap-1.5 transition-all"
+                title="Show Act Story Visualization Artwork to all players instead of the battle map"
+              >
+                <ImageIcon className="w-3.5 h-3.5" />
+                <span>Show Act {currentScene.actNumber} Story Image</span>
+              </button>
+            ) : null
+          )}
+
           {/* Tool: Move vs Ping */}
           <div className="flex bg-[#121416] p-0.5 rounded-md border border-[#2b3137]">
             <button
@@ -166,8 +202,56 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
 
       </div>
 
-      {/* Main Interactive Map Canvas */}
+      {/* Main Interactive Map Canvas OR Story Visualization Theater */}
       <div className="relative flex-1 min-h-0 bg-[#0a0b0c] overflow-hidden select-none min-w-0">
+        {activeStoryVisual ? (
+          /* STORY VISUALIZATION VIEW (Replaces Battle Map when active) */
+          <div className="relative w-full h-full flex flex-col justify-between overflow-hidden bg-black">
+            <img
+              src={activeStoryVisual.imageUrl}
+              alt={activeStoryVisual.title}
+              className="absolute inset-0 w-full h-full object-cover object-center transition-all duration-700"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/25 to-black/60 pointer-events-none" />
+
+            {/* Top Story Mode Badge & Return Button */}
+            <div className="relative z-10 p-4 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/80 border border-[#c99a45]/60 backdrop-blur-md shadow-xl">
+                <ImageIcon className="w-4 h-4 text-[#c99a45]" />
+                <span className="font-cinzel font-bold text-xs text-[#e2ba6d] uppercase tracking-wider">
+                  {activeStoryVisual.actNumber === 5
+                    ? 'Epilogue Story Visualization'
+                    : `Act ${activeStoryVisual.actNumber} Story Visualization`}
+                </span>
+              </div>
+
+              {onShowStoryVisual && (
+                <button
+                  onClick={() => onShowStoryVisual(null)}
+                  className="px-3.5 py-1.5 rounded-lg bg-black/80 hover:bg-[#1c2127] border border-white/20 text-white font-cinzel font-bold text-xs flex items-center gap-1.5 backdrop-blur-md shadow-xl transition-all"
+                >
+                  <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Return to Tactical Battle Map</span>
+                </button>
+              )}
+            </div>
+
+            {/* Bottom Atmospheric Narrative Plaque */}
+            <div className="relative z-10 p-5 sm:p-6 bg-gradient-to-t from-black via-black/90 to-transparent">
+              <div className="max-w-3xl">
+                <div className="text-xs font-cinzel font-bold text-[#c99a45] uppercase tracking-widest mb-1">
+                  {activeStoryVisual.subtitle}
+                </div>
+                <h3 className="font-cinzel text-xl sm:text-2xl font-bold text-white drop-shadow">
+                  {activeStoryVisual.title}
+                </h3>
+                <p className="text-base sm:text-lg text-[#e6e1d6] font-cormorant italic mt-2 leading-relaxed drop-shadow">
+                  “{activeStoryVisual.caption}”
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
         <div
           ref={mapRef}
           onClick={handleMapClick}
@@ -273,6 +357,7 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
           })}
 
         </div>
+        )}
       </div>
 
       {/* Bottom Scene Synopsis & GM Notes */}
